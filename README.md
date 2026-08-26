@@ -2,6 +2,8 @@
 
 OpenIn adds a configurable Finder right-click menu and Finder toolbar button for opening the current directory in terminals, editors, or custom applications.
 
+[简体中文](README-zh-CN.md)
+
 ## Features
 
 - Built-in Terminal and Editor list based on OpenInTerminal's supported applications.
@@ -11,6 +13,13 @@ OpenIn adds a configurable Finder right-click menu and Finder toolbar button for
 - Custom applications can use a URL Scheme or Shell Command with `{path}`.
 - Built-in applications expose their launch type (Shell Command or URL Scheme) and launch method, with per-item and reset-all controls.
 - Shell commands are executed by the host app because Finder Sync extensions are sandboxed.
+
+## Native macOS features and scope
+
+OpenIn does not bundle a terminal, editor, or file manager, and it does not replace Finder's native commands. It gathers launchers for applications already installed on your Mac into Finder's first-level menu. The native alternatives are:
+
+- **Copy path** — select an item and press **⌥⌘C**. Holding **⌥** while opening the context menu also reveals **Copy … as Pathname**.
+- **Create a new file** — macOS does not currently provide a native Finder command for this, and OpenIn does not add one. Use `touch filename.ext` in a terminal when needed.
 
 ## Build
 
