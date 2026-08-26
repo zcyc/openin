@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 private struct HiddenRowSeparator: ViewModifier {
@@ -155,92 +156,100 @@ struct MenuItemRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Toggle("", isOn: Binding(
-                get: { item.showInContextMenu },
-                set: { value in
-                    var updated = item
-                    updated.showInContextMenu = value
-                    onUpdate(updated)
-                }
-            ))
-            .toggleStyle(.checkbox)
-            .labelsHidden()
-            .padding(.top, 2)
-            .help("Show in Finder right-click menu")
-
-            Toggle("", isOn: Binding(
-                get: { item.showInToolbarMenu },
-                set: { value in
-                    var updated = item
-                    updated.showInToolbarMenu = value
-                    onUpdate(updated)
-                }
-            ))
-            .toggleStyle(.checkbox)
-            .labelsHidden()
-            .padding(.top, 2)
-            .help("Show in Finder toolbar menu")
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .center, spacing: 8) {
-                    TextField("Display name", text: $name)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 180)
-
-                    Image(systemName: "slider.horizontal.3")
-                        .foregroundStyle(.secondary)
-                        .help("Type")
-                        .accessibilityLabel("Type")
-                    Picker("", selection: $actionType) {
-                        ForEach(MenuItemActionType.allCases, id: \.self) {
-                            Text($0.rawValue).tag($0)
-                        }
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 8) {
+                Toggle("", isOn: Binding(
+                    get: { item.showInContextMenu },
+                    set: { value in
+                        var updated = item
+                        updated.showInContextMenu = value
+                        onUpdate(updated)
                     }
-                    .labelsHidden()
-                    .frame(width: 135)
+                ))
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+                .frame(width: 22, height: 32)
+                .help("Show in Finder right-click menu")
 
-                    Spacer()
-                    if item.isBuiltInApplication {
-                        Image(systemName: found ? "checkmark.circle.fill" : "questionmark.circle")
-                            .foregroundStyle(found ? .green : .orange)
-                            .help(found ? "Found" : "Not found")
-                            .accessibilityLabel(found ? "Found" : "Not found")
+                applicationIcon
+                TextField("Display name", text: $name)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 180)
+
+                Image(systemName: "rectangle.grid.1x2")
+                    .font(.system(size: 16))
+                    .frame(width: 18)
+                    .foregroundStyle(.secondary)
+                    .help("Type")
+                    .accessibilityLabel("Type")
+                Picker("", selection: $actionType) {
+                    ForEach(MenuItemActionType.allCases, id: \.self) {
+                        Text($0.rawValue).tag($0)
                     }
-                    if item.isBuiltInApplication {
-                        if !item.isDefaultBuiltIn {
-                            Button {
-                                onReset(item)
-                            } label: {
-                                Image(systemName: "arrow.counterclockwise")
-                            }
-                            .buttonStyle(.borderless)
-                            .help("Reset to default")
-                            .accessibilityLabel("Reset to default")
-                        }
-                    } else {
+                }
+                .labelsHidden()
+                .frame(width: 135)
+
+                Spacer()
+                if item.isBuiltInApplication {
+                    Label(
+                        found ? "Found" : "Not installed or not found",
+                        systemImage: found ? "checkmark.circle.fill" : "questionmark.circle"
+                    )
+                        .labelStyle(.iconOnly)
+                        .foregroundStyle(found ? .green : .orange)
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel(found ? "Found" : "Not installed or not found")
+                }
+                if item.isBuiltInApplication {
+                    if !item.isDefaultBuiltIn {
                         Button {
-                            onDelete(item)
+                            onReset(item)
                         } label: {
-                            Image(systemName: "trash")
-                                .foregroundStyle(.red)
+                            Image(systemName: "arrow.counterclockwise")
                         }
                         .buttonStyle(.borderless)
+                        .help("Reset to default")
+                        .accessibilityLabel("Reset to default")
                     }
+                } else {
+                    Button {
+                        onDelete(item)
+                    } label: {
+                        Image(systemName: "trash")
+                            .foregroundStyle(.red)
+                    }
+                    .buttonStyle(.borderless)
                 }
+            }
 
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.up.forward.app")
-                        .foregroundStyle(.secondary)
-                        .help("Launch")
-                        .accessibilityLabel("Launch")
-                    TextField(
-                        actionType == .urlScheme ? "myapp://open?path={path}" : "open -a Terminal {path}",
-                        text: $template
-                    )
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(.body, design: .monospaced))
-                }
+            HStack(alignment: .center, spacing: 8) {
+                Toggle("", isOn: Binding(
+                    get: { item.showInToolbarMenu },
+                    set: { value in
+                        var updated = item
+                        updated.showInToolbarMenu = value
+                        onUpdate(updated)
+                    }
+                ))
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+                .frame(width: 22, height: 32)
+                .help("Show in Finder toolbar menu")
+
+                Image(systemName: "arrow.up.forward.app")
+                    .font(.system(size: 20, weight: .light))
+                    .frame(width: 22, height: 22)
+                    .foregroundStyle(.secondary)
+                    .help("Launch")
+                    .accessibilityLabel("Launch")
+                TextField(
+                    actionType == .urlScheme ? "myapp://open?path={path}" : "open -a Terminal {path}",
+                    text: $template
+                )
+                .textFieldStyle(.roundedBorder)
+                .font(.system(.body, design: .monospaced))
             }
         }
         .padding(.vertical, 7)
@@ -258,6 +267,41 @@ struct MenuItemRow: View {
             actionType = updated.actionType
             template = updated.template
         }
+    }
+
+    @ViewBuilder
+    private var applicationIcon: some View {
+        Group {
+            if let path = applicationIconPath {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: path))
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                Image(systemName: "macwindow")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 22, height: 22)
+        .help("Application")
+    }
+
+    private var applicationIconPath: String? {
+        guard let builtIn = BuiltInApp.find(item.applicationID) else { return nil }
+        if let bundleIdentifier = builtIn.bundleIdentifier,
+           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            return url.path
+        }
+
+        guard let installationPath = builtIn.installationPath else { return nil }
+        var url = URL(fileURLWithPath: installationPath)
+        while url.path != "/" {
+            if url.pathExtension == "app" {
+                return url.path
+            }
+            url.deleteLastPathComponent()
+        }
+        return nil
     }
 
     private func commit() {
