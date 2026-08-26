@@ -2,6 +2,10 @@
 
 OpenIn 为 Finder 增加可配置的右键菜单和工具栏下拉按钮，可将当前目录打开到终端、编辑器或自定义应用中。
 
+<p align="center">
+  <img src="assets/openin_app_icon.png" alt="OpenIn 应用图标" width="128">
+</p>
+
 ## 功能
 
 - 内置 OpenInTerminal 的 Terminal、Editor 应用清单。
@@ -11,6 +15,12 @@ OpenIn 为 Finder 增加可配置的右键菜单和工具栏下拉按钮，可�
 - 支持添加自定义应用，可使用 URL Scheme 或 Shell Command，并用 `{path}` 代表当前目录。
 - 内置应用可修改启动类型（Shell Command 或 URL Scheme）和 Launch，并支持单个重置或全部重置。
 - Finder 扩展受沙盒限制，Shell Command 由宿主 App 安全转发执行。
+
+## 截图
+
+<p align="center">
+  <img src="assets/openin-settings.png" alt="OpenIn 设置窗口" width="720">
+</p>
 
 ## 系统自带功能与 OpenIn 的边界
 

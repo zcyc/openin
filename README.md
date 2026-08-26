@@ -4,6 +4,10 @@ OpenIn adds a configurable Finder right-click menu and Finder toolbar button for
 
 [简体中文](README-zh-CN.md)
 
+<p align="center">
+  <img src="assets/openin_app_icon.png" alt="OpenIn app icon" width="128">
+</p>
+
 ## Features
 
 - Built-in Terminal and Editor list based on OpenInTerminal's supported applications.
@@ -13,6 +17,12 @@ OpenIn adds a configurable Finder right-click menu and Finder toolbar button for
 - Custom applications can use a URL Scheme or Shell Command with `{path}`.
 - Built-in applications expose their launch type (Shell Command or URL Scheme) and launch method, with per-item and reset-all controls.
 - Shell commands are executed by the host app because Finder Sync extensions are sandboxed.
+
+## Screenshot
+
+<p align="center">
+  <img src="assets/openin-settings.png" alt="OpenIn Settings" width="720">
+</p>
 
 ## Native macOS features and scope
 
