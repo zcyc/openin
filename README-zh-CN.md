@@ -33,17 +33,13 @@ OpenIn 不内置终端、编辑器或文件管理器，也不替代 Finder 的�
 
 ## 编译并安装（免费本地自签名）
 
-Apple 提供免费的 **Personal Team**，可以在 Xcode 中用于个人开发和测试，但它不是 Developer ID，不能用于 App Store 或企业分发（[Apple 官方说明](https://developer.apple.com/library/archive/qa/qa1915/)）。Developer ID 签名和公证需要加入付费的 Apple Developer Program（[会员对比](https://developer.apple.com/support/compare-memberships/)）。
-
-本地体验 OpenIn 不需要付费账号，仓库中的 [Makefile](Makefile) 已封装编译、签名、注册扩展、重启 Finder 和打包流程：
+仓库中的 [Makefile](Makefile) 已封装编译、签名、注册扩展和重启 Finder 流程：
 
 ```bash
-make check    # 编译、签名、校验，并检查工作区
-make install  # 安装到 /Applications 并启用 Finder 扩展
-make package  # 生成可分享的 zip
+make install  # 编译、签名、安装并启用 Finder 扩展
 ```
 
-Makefile 使用 macOS Command Line Tools，不需要付费 Apple 账号。如果无法写入 `/Applications`，可以执行 `make install INSTALL_DIR="$HOME/Applications"`，或在 Finder 中把 `build/manual/Release/OpenIn.app` 拖入 Applications。ad hoc 自签名不等同于公证；如果 macOS 拦截首次启动，请按住 Control 点按 `OpenIn.app` 选择“打开”，或前往“系统设置 → 隐私与安全性 → 仍要打开”。
+如果无法写入 `/Applications`，可以执行 `make install INSTALL_DIR="$HOME/Applications"`，或在 Finder 中把 `build/manual/Release/OpenIn.app` 拖入 Applications。
 
 设置窗口会列出所有支持的应用，已安装的应用默认在两个菜单中勾选，也可以分别关闭。内置应用可修改类型和启动方式；自定义应用示例：
 

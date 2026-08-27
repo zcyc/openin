@@ -9,12 +9,14 @@ BUILD_DIR := build/manual
 APP := $(BUILD_DIR)/Release/$(APP_NAME).app
 EXTENSION := $(APP)/Contents/PlugIns/FinderSyncExtension.appex
 PACKAGE := $(BUILD_DIR)/$(APP_NAME)-$(VERSION).app.zip
+DMG := $(BUILD_DIR)/$(APP_NAME)-$(VERSION).dmg
+DMG_DIR := $(BUILD_DIR)/dmg
 INSTALL_DIR ?= /Applications
 INSTALL_APP := $(INSTALL_DIR)/$(APP_NAME).app
 
 SWIFTC_FLAGS := -module-cache-path "$(MODULE_CACHE)" -sdk "$(SDK_PATH)" -target "$(TARGET)"
 
-.PHONY: build sign check package install clean
+.PHONY: build sign check package dmg install clean
 
 build:
 	mkdir -p "$(APP)/Contents/MacOS" "$(APP)/Contents/Resources" "$(EXTENSION)/Contents/MacOS" "$(EXTENSION)/Contents/Resources"
@@ -51,6 +53,16 @@ package: sign
 	ditto -c -k --sequesterRsrc --keepParent "$(APP)" "$(PACKAGE)"
 	unzip -tq "$(PACKAGE)"
 	@echo "Created $(PACKAGE)"
+
+dmg: sign
+	rm -rf "$(DMG_DIR)"
+	mkdir -p "$(DMG_DIR)"
+	ditto "$(APP)" "$(DMG_DIR)/$(APP_NAME).app"
+	ln -s /Applications "$(DMG_DIR)/Applications"
+	rm -f "$(DMG)"
+	hdiutil create -volname "$(APP_NAME)" -srcfolder "$(DMG_DIR)" -ov -format UDZO "$(DMG)"
+	rm -rf "$(DMG_DIR)"
+	@echo "Created $(DMG)"
 
 install: sign
 	ditto "$(APP)" "$(INSTALL_APP)"

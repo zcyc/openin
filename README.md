@@ -33,17 +33,13 @@ OpenIn does not bundle a terminal, editor, or file manager, and it does not repl
 
 ## Build and install locally (free self-signing)
 
-Apple's free **Personal Team** can be used for personal development and testing in Xcode, but it is not a Developer ID identity and cannot be used for App Store or enterprise distribution ([Apple](https://developer.apple.com/library/archive/qa/qa1915/)). A paid Apple Developer Program membership is required for Developer ID signing and notarization ([membership comparison](https://developer.apple.com/support/compare-memberships/)).
-
-For local use, OpenIn uses a free ad hoc signature. The repository's [Makefile](Makefile) wraps compilation, signing, extension registration, Finder reload, and packaging:
+The repository's [Makefile](Makefile) wraps compilation, signing, extension registration, and Finder reload:
 
 ```bash
-make check    # compile, sign, verify, and check the worktree
-make install  # install to /Applications and enable the Finder extension
-make package  # create a distributable zip
+make install  # compile, sign, install, and enable the Finder extension
 ```
 
-The Makefile uses the macOS Command Line Tools and does not require a paid Apple account. If `/Applications` is not writable, use `make install INSTALL_DIR="$HOME/Applications"` or drag `build/manual/Release/OpenIn.app` there in Finder. Ad hoc signing is not notarization; if macOS blocks the first launch, Control-click `OpenIn.app` and choose **Open**, or use **System Settings → Privacy & Security → Open Anyway**.
+If `/Applications` is not writable, use `make install INSTALL_DIR="$HOME/Applications"` or drag `build/manual/Release/OpenIn.app` there in Finder.
 
 The settings window shows all supported apps. Installed apps are shown in both Finder menus by default; each menu can be disabled independently. Built-in launch types and launch methods can be edited and reset. Custom applications can use examples such as:
 
