@@ -47,3 +47,7 @@ make install  # 编译、签名、安装并启用 Finder 扩展
 myapp://open?path={path}
 open -a Terminal {path}
 ```
+
+## 许可证
+
+[GNU Affero General Public License v3.0 或更高版本](LICENSE)

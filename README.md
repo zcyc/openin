@@ -47,3 +47,7 @@ The settings window shows all supported apps. Installed apps are shown in both F
 myapp://open?path={path}
 open -a Terminal {path}
 ```
+
+## License
+
+[GNU Affero General Public License v3.0 or later](LICENSE)
