@@ -11,7 +11,7 @@ OpenIn adds a configurable Finder right-click menu and Finder toolbar button for
 ## Features
 
 - Built-in Terminal and Editor list based on OpenInTerminal's supported applications.
-- Built-in tty7 and Otty entries use their documented CLI launchers.
+- Additionally includes built-in tty7, Otty, Muxy, kooky, herdr, and Rio.
 - Neovim opens through Kitty, following OpenInTerminal's supported command.
 - Each item has separate checkboxes for Finder's contextual menu and toolbar dropdown.
 - Custom applications can use a URL Scheme or Shell Command with `{path}`.
@@ -31,13 +31,19 @@ OpenIn does not bundle a terminal, editor, or file manager, and it does not repl
 - **Copy path** — select an item and press **⌥⌘C**. Holding **⌥** while opening the context menu also reveals **Copy … as Pathname**.
 - **Create a new file** — macOS does not currently provide a native Finder command for this, and OpenIn does not add one. Use `touch filename.ext` in a terminal when needed.
 
-## Build
+## Build and install locally (free self-signing)
+
+Apple's free **Personal Team** can be used for personal development and testing in Xcode, but it is not a Developer ID identity and cannot be used for App Store or enterprise distribution ([Apple](https://developer.apple.com/library/archive/qa/qa1915/)). A paid Apple Developer Program membership is required for Developer ID signing and notarization ([membership comparison](https://developer.apple.com/support/compare-memberships/)).
+
+For local use, OpenIn uses a free ad hoc signature. The repository's [Makefile](Makefile) wraps compilation, signing, extension registration, Finder reload, and packaging:
 
 ```bash
-xcodebuild -project OpenIn.xcodeproj -scheme OpenIn -configuration Release -derivedDataPath build build
+make check    # compile, sign, verify, and check the worktree
+make install  # install to /Applications and enable the Finder extension
+make package  # create a distributable zip
 ```
 
-Launch `build/Build/Products/Release/OpenIn.app` once, then add OpenIn from Finder's **View → Customize Toolbar…**. If the extension is not visible, enable it in **System Settings → General → Login Items & Extensions**.
+The Makefile uses the macOS Command Line Tools and does not require a paid Apple account. If `/Applications` is not writable, use `make install INSTALL_DIR="$HOME/Applications"` or drag `build/manual/Release/OpenIn.app` there in Finder. Ad hoc signing is not notarization; if macOS blocks the first launch, Control-click `OpenIn.app` and choose **Open**, or use **System Settings → Privacy & Security → Open Anyway**.
 
 The settings window shows all supported apps. Installed apps are shown in both Finder menus by default; each menu can be disabled independently. Built-in launch types and launch methods can be edited and reset. Custom applications can use examples such as:
 

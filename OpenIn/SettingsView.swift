@@ -14,6 +14,7 @@ private struct HiddenRowSeparator: ViewModifier {
 
 struct SettingsView: View {
     @State private var items = [MenuItemConfig]()
+    @State private var searchText = ""
     @State private var showingAddSheet = false
     @State private var showingResetAllAlert = false
 
@@ -25,26 +26,17 @@ struct SettingsView: View {
         items.filter(\.showInToolbarMenu).count
     }
 
-    private var customItems: [MenuItemConfig] {
-        items.filter { !$0.isBuiltInApplication }
+    private var visibleItems: [MenuItemConfig] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return items }
+        return items.filter { $0.name.localizedCaseInsensitiveContains(query) }
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Finder menu items")
-                    .font(.title3.weight(.semibold))
-                Text("Choose applications for Finder's right-click and toolbar menus.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-
             List {
-                Section("Applications") {
-                    ForEach(items.filter(\.isBuiltInApplication)) { item in
+                Section {
+                    ForEach(visibleItems.filter(\.isBuiltInApplication)) { item in
                         MenuItemRow(
                             item: item,
                             found: BuiltInApp.find(item.applicationID)?.isAvailable ?? false,
@@ -53,8 +45,28 @@ struct SettingsView: View {
                             onReset: reset
                         )
                     }
-                    ForEach(customItems) { item in
+                    ForEach(visibleItems.filter { !$0.isBuiltInApplication }) { item in
                         MenuItemRow(item: item, found: true, onUpdate: update, onDelete: delete, onReset: reset)
+                    }
+                } header: {
+                    HStack(spacing: 8) {
+                        Text("Applications")
+                        Text("\(toolbarMenuCount) toolbar · \(contextMenuCount) right-click")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        HStack(spacing: 6) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundStyle(.secondary)
+                            TextField("Search", text: $searchText)
+                                .textFieldStyle(.plain)
+                        }
+                        .padding(.horizontal, 8)
+                        .frame(width: 180, height: 26)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(Color.primary.opacity(0.06))
+                        )
                     }
                 }
             }
@@ -75,7 +87,7 @@ struct SettingsView: View {
                 }
                 .disabled(!items.contains(where: { $0.isBuiltInApplication }))
                 Spacer()
-                Text("\(contextMenuCount) right-click · \(toolbarMenuCount) toolbar")
+                Text("Toolbar above · right-click below")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -159,17 +171,17 @@ struct MenuItemRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center, spacing: 8) {
                 Toggle("", isOn: Binding(
-                    get: { item.showInContextMenu },
+                    get: { item.showInToolbarMenu },
                     set: { value in
                         var updated = item
-                        updated.showInContextMenu = value
+                        updated.showInToolbarMenu = value
                         onUpdate(updated)
                     }
                 ))
                 .toggleStyle(.checkbox)
                 .labelsHidden()
                 .frame(width: 22, height: 32)
-                .help("Show in Finder right-click menu")
+                .help("Show in Finder toolbar menu")
 
                 applicationIcon
                 TextField("Display name", text: $name)
@@ -226,17 +238,17 @@ struct MenuItemRow: View {
 
             HStack(alignment: .center, spacing: 8) {
                 Toggle("", isOn: Binding(
-                    get: { item.showInToolbarMenu },
+                    get: { item.showInContextMenu },
                     set: { value in
                         var updated = item
-                        updated.showInToolbarMenu = value
+                        updated.showInContextMenu = value
                         onUpdate(updated)
                     }
                 ))
                 .toggleStyle(.checkbox)
                 .labelsHidden()
                 .frame(width: 22, height: 32)
-                .help("Show in Finder toolbar menu")
+                .help("Show in Finder right-click menu")
 
                 Image(systemName: "arrow.up.forward.app")
                     .font(.system(size: 20, weight: .light))
@@ -319,7 +331,7 @@ struct MenuItemRow: View {
 
 struct AddItemSheet: View {
     @State private var name = ""
-    @State private var actionType: MenuItemActionType = .urlScheme
+    @State private var actionType: MenuItemActionType = .shellCommand
     @State private var template = ""
 
     let onAdd: (MenuItemConfig) -> Void

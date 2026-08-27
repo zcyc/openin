@@ -9,7 +9,7 @@ OpenIn 为 Finder 增加可配置的右键菜单和工具栏下拉按钮，可�
 ## 功能
 
 - 内置 OpenInTerminal 的 Terminal、Editor 应用清单。
-- 内置 tty7 和 Otty，使用它们公开的 CLI 打开当前目录。
+- 额外内置 tty7、Otty、Muxy、kooky、herdr 和 Rio。
 - Neovim 通过 Kitty 启动，使用 OpenInTerminal 参考的命令。
 - 每个项目分别用勾选框控制是否显示在 Finder 右键菜单和工具栏下拉菜单中。
 - 支持添加自定义应用，可使用 URL Scheme 或 Shell Command，并用 `{path}` 代表当前目录。
@@ -31,13 +31,19 @@ OpenIn 不内置终端、编辑器或文件管理器，也不替代 Finder 的�
 - **在编辑器中打开**——Finder 的“打开方式”可以直接使用 Visual Studio Code、Cursor 等支持文件夹的应用，不需要 shell integration。
 - **新建文件**——macOS 目前没有 Finder 原生的“新建文件”命令，OpenIn 也不提供此功能。需要时可以在终端执行 `touch filename.ext`。
 
-## 编译
+## 编译并安装（免费本地自签名）
+
+Apple 提供免费的 **Personal Team**，可以在 Xcode 中用于个人开发和测试，但它不是 Developer ID，不能用于 App Store 或企业分发（[Apple 官方说明](https://developer.apple.com/library/archive/qa/qa1915/)）。Developer ID 签名和公证需要加入付费的 Apple Developer Program（[会员对比](https://developer.apple.com/support/compare-memberships/)）。
+
+本地体验 OpenIn 不需要付费账号，仓库中的 [Makefile](Makefile) 已封装编译、签名、注册扩展、重启 Finder 和打包流程：
 
 ```bash
-xcodebuild -project OpenIn.xcodeproj -scheme OpenIn -configuration Release -derivedDataPath build build
+make check    # 编译、签名、校验，并检查工作区
+make install  # 安装到 /Applications 并启用 Finder 扩展
+make package  # 生成可分享的 zip
 ```
 
-首次启动 `build/Build/Products/Release/OpenIn.app`，然后在 Finder 的“显示 → 自定义工具栏…”中加入 OpenIn。若看不到扩展，请在“系统设置 → 通用 → 登录项与扩展”中启用。
+Makefile 使用 macOS Command Line Tools，不需要付费 Apple 账号。如果无法写入 `/Applications`，可以执行 `make install INSTALL_DIR="$HOME/Applications"`，或在 Finder 中把 `build/manual/Release/OpenIn.app` 拖入 Applications。ad hoc 自签名不等同于公证；如果 macOS 拦截首次启动，请按住 Control 点按 `OpenIn.app` 选择“打开”，或前往“系统设置 → 隐私与安全性 → 仍要打开”。
 
 设置窗口会列出所有支持的应用，已安装的应用默认在两个菜单中勾选，也可以分别关闭。内置应用可修改类型和启动方式；自定义应用示例：
 
