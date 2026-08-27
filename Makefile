@@ -17,7 +17,7 @@ SWIFTC_FLAGS := -module-cache-path "$(MODULE_CACHE)" -sdk "$(SDK_PATH)" -target 
 .PHONY: build sign check package install clean
 
 build:
-	mkdir -p "$(APP)/Contents/MacOS" "$(EXTENSION)/Contents/MacOS" "$(EXTENSION)/Contents/Resources"
+	mkdir -p "$(APP)/Contents/MacOS" "$(APP)/Contents/Resources" "$(EXTENSION)/Contents/MacOS" "$(EXTENSION)/Contents/Resources"
 	swiftc $(SWIFTC_FLAGS) -framework Cocoa Shared/MenuItemConfig.swift OpenIn/main.swift OpenIn/SettingsView.swift -o "$(APP)/Contents/MacOS/OpenIn"
 	swiftc $(SWIFTC_FLAGS) -application-extension -parse-as-library -module-name FinderSyncExtension FinderSyncExtension/FinderSync.swift Shared/MenuItemConfig.swift -framework Cocoa -framework FinderSync -emit-executable -Xlinker -e -Xlinker _NSExtensionMain -o "$(EXTENSION)/Contents/MacOS/FinderSyncExtension"
 	cp OpenIn/Info.plist "$(APP)/Contents/Info.plist"
