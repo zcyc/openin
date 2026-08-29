@@ -2,8 +2,6 @@ import Cocoa
 import FinderSync
 
 final class FinderSync: FIFinderSync {
-    private var cachedItems = [MenuItemConfig]()
-
     override init() {
         super.init()
         FIFinderSyncController.default().directoryURLs = [URL(fileURLWithPath: "/")]
@@ -38,28 +36,32 @@ final class FinderSync: FIFinderSync {
         }
 
         let showsInToolbar = menuKind == .toolbarItemMenu
-        cachedItems = MenuConfigStore.load().filter {
+        guard let items = try? MenuConfigStore.load() else { return nil }
+        let visibleItems = items.filter {
             showsInToolbar ? $0.showInToolbarMenu : $0.showInContextMenu
         }
         let menu = NSMenu(title: "OpenIn")
-        guard !cachedItems.isEmpty else { return nil }
+        guard !visibleItems.isEmpty else { return nil }
 
-        for (index, item) in cachedItems.enumerated() {
+        for item in visibleItems {
             let menuItem = NSMenuItem(
                 title: item.name,
                 action: #selector(menuItemAction(_:)),
                 keyEquivalent: ""
             )
-            menuItem.tag = index
+            menuItem.representedObject = item.id.uuidString
+            menuItem.tag = menuKind == .contextualMenuForContainer ? 1 : 0
             menu.addItem(menuItem)
         }
         return menu
     }
 
     @IBAction func menuItemAction(_ sender: NSMenuItem) {
-        guard sender.tag >= 0, sender.tag < cachedItems.count else { return }
-        let item = cachedItems[sender.tag]
-        let path = currentPath()
+        guard let itemID = sender.representedObject as? String,
+              let items = try? MenuConfigStore.load(),
+              let item = items.first(where: { $0.id.uuidString == itemID }) else { return }
+        let menuKind: FIMenuKind = sender.tag == 1 ? .contextualMenuForContainer : .contextualMenuForItems
+        let path = currentPath(for: menuKind)
 
         switch item.actionType {
         case .shellCommand:
@@ -67,7 +69,7 @@ final class FinderSync: FIFinderSync {
             guard let url = MenuConfigStore.shellURL(for: command) else { return }
             NSWorkspace.shared.open(url)
         case .urlScheme:
-            let encodedPath = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
+            let encodedPath = MenuConfigStore.urlEncodedPath(path)
             let resolved = MenuConfigStore.resolve(item.template, path: encodedPath)
             guard let url = URL(string: resolved) else {
                 NSLog("[OpenIn] invalid URL Scheme template: %@", resolved)
@@ -77,8 +79,12 @@ final class FinderSync: FIFinderSync {
         }
     }
 
-    private func currentPath() -> String {
+    private func currentPath(for menuKind: FIMenuKind) -> String {
         let controller = FIFinderSyncController.default()
+        if menuKind == .contextualMenuForContainer,
+           let targeted = controller.targetedURL() {
+            return targeted.path
+        }
         if let selected = controller.selectedItemURLs()?.first {
             var isDirectory: ObjCBool = false
             if FileManager.default.fileExists(atPath: selected.path, isDirectory: &isDirectory), isDirectory.boolValue {

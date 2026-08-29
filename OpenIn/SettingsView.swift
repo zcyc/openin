@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var searchText = ""
     @State private var showingAddSheet = false
     @State private var showingResetAllAlert = false
+    @State private var didLoadItems = false
 
     private var contextMenuCount: Int {
         items.filter(\.showInContextMenu).count
@@ -80,12 +81,13 @@ struct SettingsView: View {
                 } label: {
                     Label("Add Application", systemImage: "plus")
                 }
+                .disabled(!didLoadItems)
                 Button {
                     showingResetAllAlert = true
                 } label: {
                     Label("Reset All", systemImage: "arrow.counterclockwise")
                 }
-                .disabled(!items.contains(where: { $0.isBuiltInApplication }))
+                .disabled(!didLoadItems || !items.contains(where: { $0.isBuiltInApplication }))
                 Spacer()
                 Text("Toolbar above · right-click below")
                     .font(.caption)
@@ -94,8 +96,21 @@ struct SettingsView: View {
             .padding(14)
         }
         .frame(minWidth: 520, minHeight: 420)
-        .onAppear { items = MenuConfigStore.load() }
-        .onDisappear { MenuConfigStore.save(items) }
+        .onAppear {
+            didLoadItems = false
+            items = []
+            do {
+                items = try MenuConfigStore.load()
+                didLoadItems = true
+            } catch {
+                NSLog("[OpenIn] unable to load configuration: %@", error.localizedDescription)
+            }
+        }
+        .onDisappear {
+            if didLoadItems {
+                MenuConfigStore.save(items)
+            }
+        }
         .sheet(isPresented: $showingAddSheet) {
             AddItemSheet { item in
                 items.append(item)

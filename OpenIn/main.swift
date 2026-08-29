@@ -39,6 +39,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         _ event: NSAppleEventDescriptor,
         withReplyEvent replyEvent: NSAppleEventDescriptor
     ) {
+        guard isFinderSyncRequest(event) else {
+            NSLog("[OpenIn] rejected shell request from an untrusted sender")
+            return
+        }
+
         guard let urlString = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
               let url = URL(string: urlString),
               url.scheme == "openin",
@@ -53,6 +58,21 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         launchedViaURL = true
         executeShellCommand(command)
         // Keep the settings window alive when the app was already open.
+    }
+
+    private func isFinderSyncRequest(_ event: NSAppleEventDescriptor) -> Bool {
+        guard let senderPID = event.attributeDescriptor(forKeyword: keySenderPIDAttr)?.int32Value,
+              let sender = NSRunningApplication(processIdentifier: pid_t(senderPID)),
+              sender.bundleIdentifier == MenuConfigStore.extensionBundleID,
+              let senderURL = sender.bundleURL else {
+            return false
+        }
+
+        let extensionURL = Bundle.main.bundleURL
+            .appendingPathComponent("Contents")
+            .appendingPathComponent("PlugIns")
+            .appendingPathComponent("FinderSyncExtension.appex")
+        return senderURL.standardizedFileURL == extensionURL.standardizedFileURL
     }
 
     private func executeShellCommand(_ command: String) {

@@ -36,6 +36,9 @@ struct BuiltInApp: Identifiable, Equatable {
     }
 
     var isAvailable: Bool {
+        if id == "neovim" {
+            return nvimPath != nil && BuiltInApp.find("kitty")?.isAvailable == true
+        }
         if let bundleIdentifier,
            !bundleIdentifier.isEmpty,
            NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) != nil {
@@ -43,10 +46,6 @@ struct BuiltInApp: Identifiable, Equatable {
         }
 
         let fileManager = FileManager.default
-        if id == "neovim" {
-            return ["/opt/homebrew/bin/nvim", "/usr/local/bin/nvim"]
-                .contains { fileManager.isExecutableFile(atPath: $0) }
-        }
         if let installationPath {
             return fileManager.isExecutableFile(atPath: installationPath)
         }
@@ -55,6 +54,17 @@ struct BuiltInApp: Identifiable, Equatable {
         return [URL(fileURLWithPath: "/Applications"), homeApplications]
             .map { $0.appendingPathComponent("\(name).app") }
             .contains { fileManager.fileExists(atPath: $0.path) }
+    }
+
+    var resolvedCommand: String {
+        guard id == "neovim", let nvimPath else { return command }
+        return "open -na kitty --args \(nvimPath) {path}"
+    }
+
+    private var nvimPath: String? {
+        let fileManager = FileManager.default
+        return ["/opt/homebrew/bin/nvim", "/usr/local/bin/nvim"]
+            .first { fileManager.isExecutableFile(atPath: $0) }
     }
 
     static let all: [BuiltInApp] = [
@@ -167,23 +177,31 @@ struct MenuConfigStore {
                 .appendingPathComponent("Library/Containers/\(extensionBundleID)/Data")
         }
         let directory = base.appendingPathComponent("Library/Application Support/OpenIn")
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            NSLog("[OpenIn] unable to create configuration directory: %@", error.localizedDescription)
+        }
         return directory
     }()
 
     static let configFile = sharedDirectory.appendingPathComponent("menuitems.json")
 
-    static func load() -> [MenuItemConfig] {
-        guard let data = try? Data(contentsOf: configFile),
-              let items = try? JSONDecoder().decode([MenuItemConfig].self, from: data) else {
+    static func load() throws -> [MenuItemConfig] {
+        guard FileManager.default.fileExists(atPath: configFile.path) else {
             return defaultItems()
         }
-        return items
+        let data = try Data(contentsOf: configFile)
+        return try JSONDecoder().decode([MenuItemConfig].self, from: data)
     }
 
     static func save(_ items: [MenuItemConfig]) {
-        guard let data = try? JSONEncoder().encode(items) else { return }
-        try? data.write(to: configFile, options: .atomic)
+        do {
+            let data = try JSONEncoder().encode(items)
+            try data.write(to: configFile, options: .atomic)
+        } catch {
+            NSLog("[OpenIn] unable to save configuration: %@", error.localizedDescription)
+        }
     }
 
     static func defaultItems() -> [MenuItemConfig] {
@@ -192,7 +210,7 @@ struct MenuConfigStore {
                 name: $0.name,
                 actionType: .shellCommand,
                 applicationID: $0.id,
-                template: $0.command,
+                template: $0.resolvedCommand,
                 showInContextMenu: $0.isAvailable,
                 showInToolbarMenu: $0.isAvailable
             )
@@ -206,7 +224,7 @@ struct MenuConfigStore {
             name: builtIn.name,
             actionType: .shellCommand,
             applicationID: builtIn.id,
-            template: builtIn.command,
+            template: builtIn.resolvedCommand,
             showInContextMenu: item.showInContextMenu,
             showInToolbarMenu: item.showInToolbarMenu
         )
@@ -214,6 +232,12 @@ struct MenuConfigStore {
 
     static func resolve(_ template: String, path: String) -> String {
         template.replacingOccurrences(of: pathPlaceholder, with: path)
+    }
+
+    static func urlEncodedPath(_ path: String) -> String {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~/")
+        return path.addingPercentEncoding(withAllowedCharacters: allowed) ?? path
     }
 
     static func shellQuoted(_ path: String) -> String {
