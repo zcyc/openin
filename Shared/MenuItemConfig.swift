@@ -99,7 +99,7 @@ struct BuiltInApp: Identifiable, Equatable {
         .init(id: "tty7", name: "tty7", category: .terminal, bundleIdentifier: "com.github.tty7", command: "/Applications/tty7.app/Contents/MacOS/tty7 {path}", installationPath: "/Applications/tty7.app/Contents/MacOS/tty7"),
         .init(id: "otty", name: "Otty", category: .terminal, bundleIdentifier: nil, command: "/Applications/Otty.app/Contents/MacOS/otty-cli open {path}", installationPath: "/Applications/Otty.app/Contents/MacOS/otty-cli"),
         .init(id: "muxy", name: "Muxy", category: .terminal, bundleIdentifier: "com.muxy.app", command: "open -a Muxy {path}"),
-        .init(id: "kooky", name: "kooky", category: .terminal, bundleIdentifier: "com.iamcorey.kooky", command: "\"$HOME/Library/Application Support/kooky/bin/kooky-cli\" open --cwd {path}"),
+        .init(id: "kooky", name: "kooky", category: .terminal, bundleIdentifier: "com.iamcorey.kooky", command: "\"$HOME/Library/Application Support/kooky/bin/kooky-cli\" open --cwd {path}", installationPath: NSHomeDirectory() + "/Library/Application Support/kooky/bin/kooky-cli"),
         .init(id: "herdr", name: "herdr", category: .terminal, bundleIdentifier: nil, command: "\"$HOME/.local/bin/herdr\" workspace create --cwd {path} --focus", installationPath: NSHomeDirectory() + "/.local/bin/herdr"),
         .init(id: "textedit", name: "TextEdit", category: .editor, bundleIdentifier: "com.apple.TextEdit", command: "open -a TextEdit {path}"),
         .init(id: "xcode", name: "Xcode", category: .editor, bundleIdentifier: "com.apple.dt.Xcode", command: "open -a Xcode {path}"),
@@ -214,6 +214,14 @@ struct MenuConfigStore {
         }
         let data = try Data(contentsOf: configFile)
         return try JSONDecoder().decode([MenuItemConfig].self, from: data)
+    }
+
+    static func bootstrapDefaultsIfNeeded() {
+        guard Bundle.main.bundleIdentifier != extensionBundleID,
+              !FileManager.default.fileExists(atPath: configFile.path) else {
+            return
+        }
+        save(defaultItems())
     }
 
     static func save(_ items: [MenuItemConfig]) {

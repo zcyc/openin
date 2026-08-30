@@ -80,7 +80,7 @@ final class FinderSync: FIFinderSync {
         }
         guard visibleItems.indices.contains(menuIndex) else { return }
         let item = visibleItems[menuIndex]
-        let path = currentPath(for: menuKind)
+        guard let path = currentPath(for: menuKind) else { return }
 
         switch item.actionType {
         case .shellCommand:
@@ -102,9 +102,9 @@ final class FinderSync: FIFinderSync {
         }
     }
 
-    private func currentPath(for menuKind: FIMenuKind) -> String {
+    private func currentPath(for menuKind: FIMenuKind) -> String? {
         let controller = FIFinderSyncController.default()
-        if menuKind == .contextualMenuForContainer,
+        if (menuKind == .contextualMenuForContainer || menuKind == .contextualMenuForSidebar),
            let targeted = controller.targetedURL() {
             return targeted.path
         }
@@ -118,9 +118,7 @@ final class FinderSync: FIFinderSync {
         if let targeted = controller.targetedURL() {
             return targeted.path
         }
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Desktop")
-            .path
+        return nil
     }
 
     override func beginObservingDirectory(at url: URL) {}
