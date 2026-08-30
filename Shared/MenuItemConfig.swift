@@ -86,7 +86,7 @@ struct BuiltInApp: Identifiable, Equatable {
         .init(id: "tty7", name: "tty7", category: .terminal, bundleIdentifier: "com.github.tty7", command: "/Applications/tty7.app/Contents/MacOS/tty7 {path}", installationPath: "/Applications/tty7.app/Contents/MacOS/tty7"),
         .init(id: "otty", name: "Otty", category: .terminal, bundleIdentifier: nil, command: "/Applications/Otty.app/Contents/MacOS/otty-cli open {path}", installationPath: "/Applications/Otty.app/Contents/MacOS/otty-cli"),
         .init(id: "muxy", name: "Muxy", category: .terminal, bundleIdentifier: "com.muxy.app", command: "open -a Muxy {path}"),
-        .init(id: "kooky", name: "kooky", category: .terminal, bundleIdentifier: "com.iamcorey.kooky", command: "\"$HOME/Library/Application Support/kooky/bin/kooky-cli\" open --cwd {path}", installationPath: NSHomeDirectory() + "/Library/Application Support/kooky/bin/kooky-cli"),
+        .init(id: "kooky", name: "kooky", category: .terminal, bundleIdentifier: "com.iamcorey.kooky", command: "\"$HOME/Library/Application Support/kooky/bin/kooky-cli\" open --cwd {path}"),
         .init(id: "herdr", name: "herdr", category: .terminal, bundleIdentifier: nil, command: "\"$HOME/.local/bin/herdr\" workspace create --cwd {path} --focus", installationPath: NSHomeDirectory() + "/.local/bin/herdr"),
         .init(id: "textedit", name: "TextEdit", category: .editor, bundleIdentifier: "com.apple.TextEdit", command: "open -a TextEdit {path}"),
         .init(id: "xcode", name: "Xcode", category: .editor, bundleIdentifier: "com.apple.dt.Xcode", command: "open -a Xcode {path}"),
@@ -187,6 +187,12 @@ struct MenuConfigStore {
     }()
 
     static let configFile = sharedDirectory.appendingPathComponent("menuitems.json")
+    private static let shellRequestDirectory = sharedDirectory.appendingPathComponent("Shell Requests", isDirectory: true)
+
+    private struct ShellRequest: Codable {
+        let itemIdentifier: String
+        let path: String
+    }
 
     static func load() throws -> [MenuItemConfig] {
         guard FileManager.default.fileExists(atPath: configFile.path) else {
@@ -245,14 +251,37 @@ struct MenuConfigStore {
         "'\(path.replacingOccurrences(of: "'", with: "'\\''"))'"
     }
 
-    static func shellURL(for itemIdentifier: String, path: String) -> URL? {
+    static func createShellRequest(itemIdentifier: String, path: String) -> String? {
+        let requestID = UUID().uuidString
+        let requestURL = shellRequestDirectory.appendingPathComponent(requestID).appendingPathExtension("json")
+        do {
+            try FileManager.default.createDirectory(at: shellRequestDirectory, withIntermediateDirectories: true)
+            let request = ShellRequest(itemIdentifier: itemIdentifier, path: path)
+            let data = try JSONEncoder().encode(request)
+            try data.write(to: requestURL, options: .atomic)
+            return requestID
+        } catch {
+            NSLog("[OpenIn] unable to create shell request: %@", error.localizedDescription)
+            return nil
+        }
+    }
+
+    static func consumeShellRequest(_ requestID: String) -> (itemIdentifier: String, path: String)? {
+        guard UUID(uuidString: requestID) != nil else { return nil }
+        let requestURL = shellRequestDirectory.appendingPathComponent(requestID).appendingPathExtension("json")
+        defer { try? FileManager.default.removeItem(at: requestURL) }
+        guard let data = try? Data(contentsOf: requestURL),
+              let request = try? JSONDecoder().decode(ShellRequest.self, from: data) else {
+            return nil
+        }
+        return (request.itemIdentifier, request.path)
+    }
+
+    static func shellURL(for requestID: String) -> URL? {
         var components = URLComponents()
         components.scheme = "openin"
         components.host = "shell"
-        components.queryItems = [
-            URLQueryItem(name: "item", value: itemIdentifier),
-            URLQueryItem(name: "path", value: path)
-        ]
+        components.queryItems = [URLQueryItem(name: "request", value: requestID)]
         return components.url
     }
 }

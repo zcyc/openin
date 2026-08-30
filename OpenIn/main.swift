@@ -36,16 +36,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         guard url.scheme == "openin",
               url.host == "shell",
               let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
-              let itemID = queryItems.first(where: { $0.name == "item" })?.value,
-              let path = queryItems.first(where: { $0.name == "path" })?.value,
+              let requestID = queryItems.first(where: { $0.name == "request" })?.value,
+              let request = MenuConfigStore.consumeShellRequest(requestID),
               let items = try? MenuConfigStore.load(),
-              let item = items.first(where: { $0.menuIdentifier == itemID }),
+              let item = items.first(where: { $0.menuIdentifier == request.itemIdentifier }),
               item.actionType == .shellCommand else {
             return
         }
 
         launchedViaURL = true
-        let command = MenuConfigStore.resolve(item.template, path: MenuConfigStore.shellQuoted(path))
+        let command = MenuConfigStore.resolve(item.template, path: MenuConfigStore.shellQuoted(request.path))
         executeShellCommand(command)
     }
 

@@ -50,7 +50,14 @@ final class FinderSync: FIFinderSync {
                 keyEquivalent: ""
             )
             menuItem.representedObject = item.menuIdentifier
-            menuItem.tag = menuKind == .contextualMenuForContainer ? 1 : 0
+            switch menuKind {
+            case .contextualMenuForContainer:
+                menuItem.tag = 1
+            case .toolbarItemMenu:
+                menuItem.tag = 2
+            default:
+                menuItem.tag = 0
+            }
             menu.addItem(menuItem)
         }
         return menu
@@ -60,12 +67,18 @@ final class FinderSync: FIFinderSync {
         guard let itemID = sender.representedObject as? String,
               let items = try? MenuConfigStore.load(),
               let item = items.first(where: { $0.menuIdentifier == itemID }) else { return }
-        let menuKind: FIMenuKind = sender.tag == 1 ? .contextualMenuForContainer : .contextualMenuForItems
+        let menuKind: FIMenuKind
+        switch sender.tag {
+        case 1: menuKind = .contextualMenuForContainer
+        case 2: menuKind = .toolbarItemMenu
+        default: menuKind = .contextualMenuForItems
+        }
         let path = currentPath(for: menuKind)
 
         switch item.actionType {
         case .shellCommand:
-            guard let url = MenuConfigStore.shellURL(for: item.menuIdentifier, path: path) else { return }
+            guard let requestID = MenuConfigStore.createShellRequest(itemIdentifier: item.menuIdentifier, path: path),
+                  let url = MenuConfigStore.shellURL(for: requestID) else { return }
             NSWorkspace.shared.open(url)
         case .urlScheme:
             let encodedPath = MenuConfigStore.urlEncodedPath(path)
@@ -80,7 +93,7 @@ final class FinderSync: FIFinderSync {
 
     private func currentPath(for menuKind: FIMenuKind) -> String {
         let controller = FIFinderSyncController.default()
-        if menuKind == .contextualMenuForContainer,
+        if (menuKind == .toolbarItemMenu || menuKind == .contextualMenuForContainer),
            let targeted = controller.targetedURL() {
             return targeted.path
         }
