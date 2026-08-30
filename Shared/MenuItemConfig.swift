@@ -39,16 +39,16 @@ struct BuiltInApp: Identifiable, Equatable {
         if id == "neovim" {
             return nvimPath != nil && BuiltInApp.find("kitty")?.isAvailable == true
         }
+        let fileManager = FileManager.default
+        if let installationPath {
+            return fileManager.isExecutableFile(atPath: installationPath)
+        }
         if let bundleIdentifier,
            !bundleIdentifier.isEmpty,
            NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) != nil {
             return true
         }
 
-        let fileManager = FileManager.default
-        if let installationPath {
-            return fileManager.isExecutableFile(atPath: installationPath)
-        }
         let homeApplications = fileManager.homeDirectoryForCurrentUser
             .appendingPathComponent("Applications")
         return [URL(fileURLWithPath: "/Applications"), homeApplications]
@@ -83,10 +83,10 @@ struct BuiltInApp: Identifiable, Equatable {
         .init(id: "fork", name: "Fork", category: .terminal, bundleIdentifier: "com.DanPristupov.Fork", command: "open -a Fork {path}"),
         .init(id: "ghostty", name: "Ghostty", category: .terminal, bundleIdentifier: "com.mitchellh.ghostty", command: "open -a Ghostty {path}"),
         .init(id: "kaku", name: "Kaku", category: .terminal, bundleIdentifier: "fun.tw93.kaku", command: "open -a Kaku {path}"),
-        .init(id: "tty7", name: "tty7", category: .terminal, bundleIdentifier: "com.github.tty7", command: "/Applications/tty7.app/Contents/MacOS/tty7 {path}"),
+        .init(id: "tty7", name: "tty7", category: .terminal, bundleIdentifier: "com.github.tty7", command: "/Applications/tty7.app/Contents/MacOS/tty7 {path}", installationPath: "/Applications/tty7.app/Contents/MacOS/tty7"),
         .init(id: "otty", name: "Otty", category: .terminal, bundleIdentifier: nil, command: "/Applications/Otty.app/Contents/MacOS/otty-cli open {path}", installationPath: "/Applications/Otty.app/Contents/MacOS/otty-cli"),
         .init(id: "muxy", name: "Muxy", category: .terminal, bundleIdentifier: "com.muxy.app", command: "open -a Muxy {path}"),
-        .init(id: "kooky", name: "kooky", category: .terminal, bundleIdentifier: "com.iamcorey.kooky", command: "\"$HOME/Library/Application Support/kooky/bin/kooky-cli\" open --cwd {path}"),
+        .init(id: "kooky", name: "kooky", category: .terminal, bundleIdentifier: "com.iamcorey.kooky", command: "\"$HOME/Library/Application Support/kooky/bin/kooky-cli\" open --cwd {path}", installationPath: NSHomeDirectory() + "/Library/Application Support/kooky/bin/kooky-cli"),
         .init(id: "herdr", name: "herdr", category: .terminal, bundleIdentifier: nil, command: "\"$HOME/.local/bin/herdr\" workspace create --cwd {path} --focus", installationPath: NSHomeDirectory() + "/.local/bin/herdr"),
         .init(id: "textedit", name: "TextEdit", category: .editor, bundleIdentifier: "com.apple.TextEdit", command: "open -a TextEdit {path}"),
         .init(id: "xcode", name: "Xcode", category: .editor, bundleIdentifier: "com.apple.dt.Xcode", command: "open -a Xcode {path}"),
@@ -154,6 +154,10 @@ struct MenuItemConfig: Codable, Identifiable, Equatable {
         applicationID != nil
     }
 
+    var menuIdentifier: String {
+        applicationID ?? id.uuidString
+    }
+
     var isDefaultBuiltIn: Bool {
         guard let defaultItem = MenuConfigStore.defaultItem(for: self) else { return false }
         return name == defaultItem.name &&
@@ -163,18 +167,15 @@ struct MenuItemConfig: Codable, Identifiable, Equatable {
 }
 
 struct MenuConfigStore {
+    static let applicationGroupID = "group.com.local.OpenIn"
     static let extensionBundleID = "com.local.OpenIn.FinderSync"
     static let pathPlaceholder = "{path}"
 
     static let sharedDirectory: URL = {
-        let isExtension = Bundle.main.bundleIdentifier == extensionBundleID
-        let base: URL
-        if isExtension {
-            base = URL(fileURLWithPath: NSHomeDirectory())
-        } else {
-            let home = getpwuid(getuid()).map { String(cString: $0.pointee.pw_dir) } ?? NSHomeDirectory()
-            base = URL(fileURLWithPath: home)
-                .appendingPathComponent("Library/Containers/\(extensionBundleID)/Data")
+        guard let base = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: applicationGroupID
+        ) else {
+            preconditionFailure("[OpenIn] app group container unavailable")
         }
         let directory = base.appendingPathComponent("Library/Application Support/OpenIn")
         do {
@@ -244,11 +245,14 @@ struct MenuConfigStore {
         "'\(path.replacingOccurrences(of: "'", with: "'\\''"))'"
     }
 
-    static func shellURL(for command: String) -> URL? {
+    static func shellURL(for itemIdentifier: String, path: String) -> URL? {
         var components = URLComponents()
         components.scheme = "openin"
         components.host = "shell"
-        components.queryItems = [URLQueryItem(name: "cmd", value: Data(command.utf8).base64EncodedString())]
+        components.queryItems = [
+            URLQueryItem(name: "item", value: itemIdentifier),
+            URLQueryItem(name: "path", value: path)
+        ]
         return components.url
     }
 }

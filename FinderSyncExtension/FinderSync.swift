@@ -49,7 +49,7 @@ final class FinderSync: FIFinderSync {
                 action: #selector(menuItemAction(_:)),
                 keyEquivalent: ""
             )
-            menuItem.representedObject = item.id.uuidString
+            menuItem.representedObject = item.menuIdentifier
             menuItem.tag = menuKind == .contextualMenuForContainer ? 1 : 0
             menu.addItem(menuItem)
         }
@@ -59,14 +59,13 @@ final class FinderSync: FIFinderSync {
     @IBAction func menuItemAction(_ sender: NSMenuItem) {
         guard let itemID = sender.representedObject as? String,
               let items = try? MenuConfigStore.load(),
-              let item = items.first(where: { $0.id.uuidString == itemID }) else { return }
+              let item = items.first(where: { $0.menuIdentifier == itemID }) else { return }
         let menuKind: FIMenuKind = sender.tag == 1 ? .contextualMenuForContainer : .contextualMenuForItems
         let path = currentPath(for: menuKind)
 
         switch item.actionType {
         case .shellCommand:
-            let command = MenuConfigStore.resolve(item.template, path: MenuConfigStore.shellQuoted(path))
-            guard let url = MenuConfigStore.shellURL(for: command) else { return }
+            guard let url = MenuConfigStore.shellURL(for: item.menuIdentifier, path: path) else { return }
             NSWorkspace.shared.open(url)
         case .urlScheme:
             let encodedPath = MenuConfigStore.urlEncodedPath(path)

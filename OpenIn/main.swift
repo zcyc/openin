@@ -11,15 +11,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow?
     private var launchedViaURL = false
 
-    func applicationWillFinishLaunching(_ notification: Notification) {
-        NSAppleEventManager.shared().setEventHandler(
-            self,
-            andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
-            forEventClass: AEEventClass(kInternetEventClass),
-            andEventID: AEEventID(kAEGetURL)
-        )
-    }
-
     func applicationDidFinishLaunching(_ notification: Notification) {
         if launchedViaURL {
             registerExtension()
@@ -35,44 +26,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         true
     }
 
-    @objc private func handleGetURLEvent(
-        _ event: NSAppleEventDescriptor,
-        withReplyEvent replyEvent: NSAppleEventDescriptor
-    ) {
-        guard isFinderSyncRequest(event) else {
-            NSLog("[OpenIn] rejected shell request from an untrusted sender")
-            return
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            handleShellURL(url)
         }
+    }
 
-        guard let urlString = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
-              let url = URL(string: urlString),
-              url.scheme == "openin",
+    private func handleShellURL(_ url: URL) {
+        guard url.scheme == "openin",
               url.host == "shell",
-              let commandValue = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                .queryItems?.first(where: { $0.name == "cmd" })?.value,
-              let data = Data(base64Encoded: commandValue),
-              let command = String(data: data, encoding: .utf8) else {
+              let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+              let itemID = queryItems.first(where: { $0.name == "item" })?.value,
+              let path = queryItems.first(where: { $0.name == "path" })?.value,
+              let items = try? MenuConfigStore.load(),
+              let item = items.first(where: { $0.menuIdentifier == itemID }),
+              item.actionType == .shellCommand else {
             return
         }
 
         launchedViaURL = true
+        let command = MenuConfigStore.resolve(item.template, path: MenuConfigStore.shellQuoted(path))
         executeShellCommand(command)
-        // Keep the settings window alive when the app was already open.
-    }
-
-    private func isFinderSyncRequest(_ event: NSAppleEventDescriptor) -> Bool {
-        guard let senderPID = event.attributeDescriptor(forKeyword: keySenderPIDAttr)?.int32Value,
-              let sender = NSRunningApplication(processIdentifier: pid_t(senderPID)),
-              sender.bundleIdentifier == MenuConfigStore.extensionBundleID,
-              let senderURL = sender.bundleURL else {
-            return false
-        }
-
-        let extensionURL = Bundle.main.bundleURL
-            .appendingPathComponent("Contents")
-            .appendingPathComponent("PlugIns")
-            .appendingPathComponent("FinderSyncExtension.appex")
-        return senderURL.standardizedFileURL == extensionURL.standardizedFileURL
     }
 
     private func executeShellCommand(_ command: String) {

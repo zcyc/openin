@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var searchText = ""
     @State private var showingAddSheet = false
     @State private var showingResetAllAlert = false
+    @State private var showingLoadError = false
     @State private var didLoadItems = false
 
     private var contextMenuCount: Int {
@@ -72,6 +73,16 @@ struct SettingsView: View {
                 }
             }
             .listStyle(.inset)
+            .alert("Unable to load configuration", isPresented: $showingLoadError) {
+                Button("Restore Defaults", role: .destructive) {
+                    items = MenuConfigStore.defaultItems()
+                    didLoadItems = true
+                    MenuConfigStore.save(items)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("The existing configuration was not changed.")
+            }
 
             Divider()
 
@@ -98,12 +109,14 @@ struct SettingsView: View {
         .frame(minWidth: 520, minHeight: 420)
         .onAppear {
             didLoadItems = false
+            showingLoadError = false
             items = []
             do {
                 items = try MenuConfigStore.load()
                 didLoadItems = true
             } catch {
                 NSLog("[OpenIn] unable to load configuration: %@", error.localizedDescription)
+                showingLoadError = true
             }
         }
         .onDisappear {
