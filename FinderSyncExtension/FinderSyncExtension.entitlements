@@ -5,9 +5,5 @@
 	<!-- Finder Sync extensions require sandbox to be loaded by the system -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.com.local.OpenIn</string>
-	</array>
 </dict>
 </plist>

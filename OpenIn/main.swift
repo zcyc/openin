@@ -11,6 +11,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow?
     private var launchedViaURL = false
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         if launchedViaURL {
             registerExtension()
@@ -26,10 +35,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         true
     }
 
-    func application(_ application: NSApplication, open urls: [URL]) {
-        for url in urls {
-            handleShellURL(url)
+    @objc private func handleGetURLEvent(
+        _ event: NSAppleEventDescriptor,
+        withReplyEvent replyEvent: NSAppleEventDescriptor
+    ) {
+        guard let urlString = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
+              let url = URL(string: urlString) else {
+            return
         }
+        handleShellURL(url)
     }
 
     private func handleShellURL(_ url: URL) {

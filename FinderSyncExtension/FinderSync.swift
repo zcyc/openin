@@ -31,7 +31,8 @@ final class FinderSync: FIFinderSync {
     override func menu(for menuKind: FIMenuKind) -> NSMenu? {
         guard menuKind == .toolbarItemMenu ||
               menuKind == .contextualMenuForContainer ||
-              menuKind == .contextualMenuForItems else {
+              menuKind == .contextualMenuForItems ||
+              menuKind == .contextualMenuForSidebar else {
             return nil
         }
 
@@ -43,43 +44,53 @@ final class FinderSync: FIFinderSync {
         let menu = NSMenu(title: "OpenIn")
         guard !visibleItems.isEmpty else { return nil }
 
-        for item in visibleItems {
+        let menuKindTag: Int
+        switch menuKind {
+        case .contextualMenuForContainer: menuKindTag = 1
+        case .contextualMenuForSidebar: menuKindTag = 2
+        case .toolbarItemMenu: menuKindTag = 3
+        default: menuKindTag = 0
+        }
+
+        for (index, item) in visibleItems.enumerated() {
             let menuItem = NSMenuItem(
                 title: item.name,
                 action: #selector(menuItemAction(_:)),
                 keyEquivalent: ""
             )
-            menuItem.representedObject = item.menuIdentifier
-            switch menuKind {
-            case .contextualMenuForContainer:
-                menuItem.tag = 1
-            case .toolbarItemMenu:
-                menuItem.tag = 2
-            default:
-                menuItem.tag = 0
-            }
+            menuItem.tag = menuKindTag * 1000 + index
             menu.addItem(menuItem)
         }
         return menu
     }
 
     @IBAction func menuItemAction(_ sender: NSMenuItem) {
-        guard let itemID = sender.representedObject as? String,
-              let items = try? MenuConfigStore.load(),
-              let item = items.first(where: { $0.menuIdentifier == itemID }) else { return }
+        let menuIndex = sender.tag % 1000
         let menuKind: FIMenuKind
-        switch sender.tag {
+        switch sender.tag / 1000 {
         case 1: menuKind = .contextualMenuForContainer
-        case 2: menuKind = .toolbarItemMenu
-        default: menuKind = .contextualMenuForItems
+        case 2: menuKind = .contextualMenuForSidebar
+        case 3: menuKind = .toolbarItemMenu
+        case 0: menuKind = .contextualMenuForItems
+        default: return
         }
+        guard let items = try? MenuConfigStore.load() else { return }
+        let visibleItems = items.filter {
+            menuKind == .toolbarItemMenu ? $0.showInToolbarMenu : $0.showInContextMenu
+        }
+        guard visibleItems.indices.contains(menuIndex) else { return }
+        let item = visibleItems[menuIndex]
         let path = currentPath(for: menuKind)
 
         switch item.actionType {
         case .shellCommand:
             guard let requestID = MenuConfigStore.createShellRequest(itemIdentifier: item.menuIdentifier, path: path),
                   let url = MenuConfigStore.shellURL(for: requestID) else { return }
-            NSWorkspace.shared.open(url)
+            guard NSWorkspace.shared.open(url) else {
+                NSLog("[OpenIn] unable to open shell request URL for %@", item.menuIdentifier)
+                return
+            }
+            NSLog("[OpenIn] dispatched shell request for %@", item.menuIdentifier)
         case .urlScheme:
             let encodedPath = MenuConfigStore.urlEncodedPath(path)
             let resolved = MenuConfigStore.resolve(item.template, path: encodedPath)
@@ -93,7 +104,7 @@ final class FinderSync: FIFinderSync {
 
     private func currentPath(for menuKind: FIMenuKind) -> String {
         let controller = FIFinderSyncController.default()
-        if (menuKind == .toolbarItemMenu || menuKind == .contextualMenuForContainer),
+        if menuKind == .contextualMenuForContainer,
            let targeted = controller.targetedURL() {
             return targeted.path
         }

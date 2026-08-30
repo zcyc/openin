@@ -328,20 +328,7 @@ struct MenuItemRow: View {
 
     private var applicationIconPath: String? {
         guard let builtIn = BuiltInApp.find(item.applicationID) else { return nil }
-        if let bundleIdentifier = builtIn.bundleIdentifier,
-           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
-            return url.path
-        }
-
-        guard let installationPath = builtIn.installationPath else { return nil }
-        var url = URL(fileURLWithPath: installationPath)
-        while url.path != "/" {
-            if url.pathExtension == "app" {
-                return url.path
-            }
-            url.deleteLastPathComponent()
-        }
-        return nil
+        return builtIn.applicationBundlePath
     }
 
     private func commit() {

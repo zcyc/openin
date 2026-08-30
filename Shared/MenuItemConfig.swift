@@ -43,17 +43,30 @@ struct BuiltInApp: Identifiable, Equatable {
         if let installationPath {
             return fileManager.isExecutableFile(atPath: installationPath)
         }
-        if let bundleIdentifier,
-           !bundleIdentifier.isEmpty,
-           NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) != nil {
-            return true
+        return applicationBundlePath != nil
+    }
+
+    var applicationBundlePath: String? {
+        if let installationPath {
+            var url = URL(fileURLWithPath: installationPath)
+            while url.path != "/" {
+                if url.pathExtension == "app" {
+                    return url.path
+                }
+                url.deleteLastPathComponent()
+            }
         }
 
+        let fileManager = FileManager.default
         let homeApplications = fileManager.homeDirectoryForCurrentUser
             .appendingPathComponent("Applications")
-        return [URL(fileURLWithPath: "/Applications"), homeApplications]
-            .map { $0.appendingPathComponent("\(name).app") }
-            .contains { fileManager.fileExists(atPath: $0.path) }
+        let candidates = [
+            URL(fileURLWithPath: "/Applications/\(name).app"),
+            homeApplications.appendingPathComponent("\(name).app"),
+            URL(fileURLWithPath: "/System/Applications/\(name).app"),
+            URL(fileURLWithPath: "/System/Applications/Utilities/\(name).app")
+        ]
+        return candidates.first { fileManager.fileExists(atPath: $0.path) }?.path
     }
 
     var resolvedCommand: String {
@@ -167,15 +180,16 @@ struct MenuItemConfig: Codable, Identifiable, Equatable {
 }
 
 struct MenuConfigStore {
-    static let applicationGroupID = "group.com.local.OpenIn"
     static let extensionBundleID = "com.local.OpenIn.FinderSync"
     static let pathPlaceholder = "{path}"
 
     static let sharedDirectory: URL = {
-        guard let base = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: applicationGroupID
-        ) else {
-            preconditionFailure("[OpenIn] app group container unavailable")
+        let base: URL
+        if Bundle.main.bundleIdentifier == extensionBundleID {
+            base = URL(fileURLWithPath: NSHomeDirectory())
+        } else {
+            base = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Containers/\(extensionBundleID)/Data")
         }
         let directory = base.appendingPathComponent("Library/Application Support/OpenIn")
         do {

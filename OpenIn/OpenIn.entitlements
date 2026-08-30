@@ -5,9 +5,5 @@
 	<!-- Disable sandboxing so we can run shell commands and launch apps freely -->
 	<key>com.apple.security.app-sandbox</key>
 	<false/>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.com.local.OpenIn</string>
-	</array>
 </dict>
 </plist>
