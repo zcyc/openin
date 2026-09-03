@@ -14,6 +14,7 @@ OpenIn adds a configurable Finder right-click menu and Finder toolbar button for
 - Additionally includes built-in tty7, Otty, Muxy, kooky, herdr, and Rio.
 - Neovim opens through Kitty, following OpenInTerminal's supported command.
 - Each item has separate checkboxes for Finder's contextual menu and toolbar dropdown.
+- Terminal, iTerm, kitty, WezTerm, Warp, Ghostty, and cmux can open in a new window or tab.
 - Custom applications can use a URL Scheme or Shell Command with `{path}`.
 - Built-in applications expose their launch type (Shell Command or URL Scheme) and launch method, with per-item and reset-all controls.
 - Shell commands are executed by the host app because Finder Sync extensions are sandboxed.

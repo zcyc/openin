@@ -12,6 +12,7 @@ OpenIn 为 Finder 增加可配置的右键菜单和工具栏下拉按钮，可�
 - 额外内置 tty7、Otty、Muxy、kooky、herdr 和 Rio。
 - Neovim 通过 Kitty 启动，使用 OpenInTerminal 参考的命令。
 - 每个项目分别用勾选框控制是否显示在 Finder 右键菜单和工具栏下拉菜单中。
+- Terminal、iTerm、kitty、WezTerm、Warp、Ghostty 和 cmux 可分别选择新窗口或新标签页打开。
 - 支持添加自定义应用，可使用 URL Scheme 或 Shell Command，并用 `{path}` 代表当前目录。
 - 内置应用可修改启动类型（Shell Command 或 URL Scheme）和 Launch，并支持单个重置或全部重置。
 - Finder 扩展受沙盒限制，Shell Command 由宿主 App 安全转发执行。

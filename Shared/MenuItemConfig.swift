@@ -6,6 +6,11 @@ enum MenuItemActionType: String, Codable, CaseIterable {
     case shellCommand = "Shell Command"
 }
 
+enum OpenMode: String, Codable, CaseIterable {
+    case window = "New Window"
+    case tab = "New Tab"
+}
+
 enum AppCategory: String, Codable {
     case terminal = "Terminal"
     case editor = "Editor"
@@ -72,6 +77,62 @@ struct BuiltInApp: Identifiable, Equatable {
     var resolvedCommand: String {
         guard id == "neovim", let nvimPath else { return command }
         return "open -na kitty --args \(nvimPath) {path}"
+    }
+
+    var supportedOpenModes: [OpenMode] {
+        switch id {
+        case "terminal", "iterm", "kitty", "wezterm", "warp", "ghostty", "cmux":
+            return OpenMode.allCases
+        default:
+            return []
+        }
+    }
+
+    func command(for mode: OpenMode) -> String {
+        switch id {
+        case "terminal":
+            switch mode {
+            case .window:
+                return "osascript -e 'on run argv' -e 'tell application \"Terminal\" to do script \"cd \" & quoted form of (item 1 of argv)' -e 'end run' -- {path}"
+            case .tab:
+                return "osascript -e 'on run argv' -e 'set myCommand to \"cd \" & quoted form of (item 1 of argv)' -e 'tell application \"Terminal\"' -e 'if (count of windows) = 0 then' -e 'do script myCommand' -e 'else' -e 'do script myCommand in front window' -e 'end if' -e 'end tell' -e 'end run' -- {path}"
+            }
+        case "iterm":
+            switch mode {
+            case .window:
+                return "osascript -e 'on run argv' -e 'set myCommand to \"cd \" & quoted form of (item 1 of argv)' -e 'tell application \"iTerm2\" to create window with default profile command myCommand' -e 'end run' -- {path}"
+            case .tab:
+                return "osascript -e 'on run argv' -e 'set myCommand to \"cd \" & quoted form of (item 1 of argv)' -e 'tell application \"iTerm2\"' -e 'if (count of windows) = 0 then' -e 'create window with default profile command myCommand' -e 'else' -e 'tell current window to create tab with default profile command myCommand' -e 'end if' -e 'end tell' -e 'end run' -- {path}"
+            }
+        case "kitty":
+            switch mode {
+            case .window:
+                return command
+            case .tab:
+                return "kitten @ launch --type=tab --cwd {path}"
+            }
+        case "wezterm":
+            return mode == .tab
+                ? "open -a wezterm --args start --new-tab --cwd {path}"
+                : command
+        case "warp":
+            return mode == .tab
+                ? "open \"warp://action/new_tab?path={urlPath}\""
+                : "open \"warp://action/new_window?path={urlPath}\""
+        case "ghostty":
+            switch mode {
+            case .window:
+                return "osascript -e 'on run argv' -e 'set cfg to new surface configuration' -e 'set initial working directory of cfg to item 1 of argv' -e 'tell application \"Ghostty\" to new window with configuration cfg' -e 'end run' -- {path}"
+            case .tab:
+                return "osascript -e 'on run argv' -e 'set cfg to new surface configuration' -e 'set initial working directory of cfg to item 1 of argv' -e 'tell application \"Ghostty\"' -e 'if (count of windows) = 0 then' -e 'new window with configuration cfg' -e 'else' -e 'set win to front window' -e 'new tab in win with configuration cfg' -e 'end if' -e 'end tell' -e 'end run' -- {path}"
+            }
+        case "cmux":
+            return mode == .tab
+                ? "cmux new-workspace --cwd {path}"
+                : "cmux new-window && cmux new-workspace --cwd {path}"
+        default:
+            return resolvedCommand
+        }
     }
 
     private var nvimPath: String? {
@@ -142,6 +203,7 @@ struct MenuItemConfig: Codable, Identifiable, Equatable {
     var actionType: MenuItemActionType
     var applicationID: String?
     var template: String
+    var openMode: OpenMode?
     var showInContextMenu: Bool
     var showInToolbarMenu: Bool
 
@@ -151,6 +213,7 @@ struct MenuItemConfig: Codable, Identifiable, Equatable {
         actionType: MenuItemActionType,
         applicationID: String? = nil,
         template: String,
+        openMode: OpenMode? = nil,
         showInContextMenu: Bool = true,
         showInToolbarMenu: Bool = true
     ) {
@@ -159,6 +222,7 @@ struct MenuItemConfig: Codable, Identifiable, Equatable {
         self.actionType = actionType
         self.applicationID = applicationID
         self.template = template
+        self.openMode = openMode
         self.showInContextMenu = showInContextMenu
         self.showInToolbarMenu = showInToolbarMenu
     }
@@ -175,13 +239,15 @@ struct MenuItemConfig: Codable, Identifiable, Equatable {
         guard let defaultItem = MenuConfigStore.defaultItem(for: self) else { return false }
         return name == defaultItem.name &&
                actionType == defaultItem.actionType &&
-               template == defaultItem.template
+               template == defaultItem.template &&
+               (openMode ?? .window) == (defaultItem.openMode ?? .window)
     }
 }
 
 struct MenuConfigStore {
     static let extensionBundleID = "com.local.OpenIn.FinderSync"
     static let pathPlaceholder = "{path}"
+    static let urlPathPlaceholder = "{urlPath}"
 
     static let sharedDirectory: URL = {
         let base: URL
@@ -210,7 +276,7 @@ struct MenuConfigStore {
 
     static func load() throws -> [MenuItemConfig] {
         guard FileManager.default.fileExists(atPath: configFile.path) else {
-            return defaultItems()
+            return defaultItems(showBuiltInMenus: false)
         }
         let data = try Data(contentsOf: configFile)
         return try JSONDecoder().decode([MenuItemConfig].self, from: data)
@@ -221,7 +287,7 @@ struct MenuConfigStore {
               !FileManager.default.fileExists(atPath: configFile.path) else {
             return
         }
-        save(defaultItems())
+        save(defaultItems(showBuiltInMenus: false))
     }
 
     static func save(_ items: [MenuItemConfig]) {
@@ -233,15 +299,16 @@ struct MenuConfigStore {
         }
     }
 
-    static func defaultItems() -> [MenuItemConfig] {
+    static func defaultItems(showBuiltInMenus: Bool = true) -> [MenuItemConfig] {
         BuiltInApp.all.map {
             MenuItemConfig(
                 name: $0.name,
                 actionType: .shellCommand,
                 applicationID: $0.id,
-                template: $0.resolvedCommand,
-                showInContextMenu: $0.isAvailable,
-                showInToolbarMenu: $0.isAvailable
+                template: $0.command(for: .window),
+                openMode: $0.supportedOpenModes.isEmpty ? nil : .window,
+                showInContextMenu: showBuiltInMenus && $0.isAvailable,
+                showInToolbarMenu: showBuiltInMenus && $0.isAvailable
             )
         }
     }
@@ -253,14 +320,17 @@ struct MenuConfigStore {
             name: builtIn.name,
             actionType: .shellCommand,
             applicationID: builtIn.id,
-            template: builtIn.resolvedCommand,
+            template: builtIn.command(for: .window),
+            openMode: builtIn.supportedOpenModes.isEmpty ? nil : .window,
             showInContextMenu: item.showInContextMenu,
             showInToolbarMenu: item.showInToolbarMenu
         )
     }
 
-    static func resolve(_ template: String, path: String) -> String {
-        template.replacingOccurrences(of: pathPlaceholder, with: path)
+    static func resolve(_ template: String, path: String, urlPath: String? = nil) -> String {
+        template
+            .replacingOccurrences(of: pathPlaceholder, with: path)
+            .replacingOccurrences(of: urlPathPlaceholder, with: urlPath ?? path)
     }
 
     static func urlEncodedPath(_ path: String) -> String {

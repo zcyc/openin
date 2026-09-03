@@ -139,7 +139,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This restores their type, launch method, and menu visibility to the defaults.")
+            Text("This restores their type, opening mode, launch method, and menu visibility to the defaults.")
         }
     }
 
@@ -177,6 +177,7 @@ struct MenuItemRow: View {
     @State private var name: String
     @State private var actionType: MenuItemActionType
     @State private var template: String
+    @State private var openMode: OpenMode
 
     init(
         item: MenuItemConfig,
@@ -193,6 +194,7 @@ struct MenuItemRow: View {
         _name = State(initialValue: item.name)
         _actionType = State(initialValue: item.actionType)
         _template = State(initialValue: item.template)
+        _openMode = State(initialValue: item.openMode ?? .window)
     }
 
     var body: some View {
@@ -214,11 +216,11 @@ struct MenuItemRow: View {
                 applicationIcon
                 TextField("Display name", text: $name)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 180)
+                    .frame(width: 135)
 
-                Image(systemName: "rectangle.grid.1x2")
+                Image(systemName: "terminal")
                     .font(.system(size: 16))
-                    .frame(width: 18)
+                    .frame(width: 22, height: 22)
                     .foregroundStyle(.secondary)
                     .help("Type")
                     .accessibilityLabel("Type")
@@ -230,18 +232,26 @@ struct MenuItemRow: View {
                 .labelsHidden()
                 .frame(width: 135)
 
-                Spacer()
-                if item.isBuiltInApplication {
-                    Label(
-                        found ? "Found" : "Not installed or not found",
-                        systemImage: found ? "checkmark.circle.fill" : "questionmark.circle"
-                    )
-                        .labelStyle(.iconOnly)
-                        .foregroundStyle(found ? .green : .orange)
+                if supportsOpenModeSelection {
+                    Image(systemName: "macwindow")
+                        .font(.system(size: 16, weight: .regular))
                         .frame(width: 22, height: 22)
-                        .contentShape(Rectangle())
-                        .accessibilityLabel(found ? "Found" : "Not installed or not found")
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Open mode")
+
+                    Picker("Open", selection: openModeBinding) {
+                        ForEach(supportedOpenModes, id: \.self) {
+                            Text($0.rawValue).tag($0)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .frame(width: 135)
+                    .help("Open in a new window or tab")
+                    .accessibilityLabel("Open mode")
                 }
+
+                Spacer(minLength: 0)
                 if item.isBuiltInApplication {
                     if !item.isDefaultBuiltIn {
                         Button {
@@ -279,7 +289,7 @@ struct MenuItemRow: View {
                 .help("Show in Finder right-click menu")
 
                 Image(systemName: "arrow.up.forward.app")
-                    .font(.system(size: 20, weight: .light))
+                    .font(.system(size: 16, weight: .regular))
                     .frame(width: 22, height: 22)
                     .foregroundStyle(.secondary)
                     .help("Launch")
@@ -306,19 +316,24 @@ struct MenuItemRow: View {
             name = updated.name
             actionType = updated.actionType
             template = updated.template
+            openMode = updated.openMode ?? .window
         }
     }
 
     @ViewBuilder
     private var applicationIcon: some View {
         Group {
-            if let path = applicationIconPath {
+            if found, let path = applicationIconPath {
                 Image(nsImage: NSWorkspace.shared.icon(forFile: path))
                     .resizable()
                     .aspectRatio(contentMode: .fit)
+            } else if item.isBuiltInApplication {
+                Image(systemName: "questionmark.circle")
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(.secondary)
             } else {
                 Image(systemName: "macwindow")
-                    .font(.system(size: 16))
+                    .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(.secondary)
             }
         }
@@ -331,13 +346,36 @@ struct MenuItemRow: View {
         return builtIn.applicationBundlePath
     }
 
-    private func commit() {
+    private var supportedOpenModes: [OpenMode] {
+        guard actionType == .shellCommand else { return [] }
+        return BuiltInApp.find(item.applicationID)?.supportedOpenModes ?? []
+    }
+
+    private var supportsOpenModeSelection: Bool {
+        supportedOpenModes.count > 1
+    }
+
+    private var openModeBinding: Binding<OpenMode> {
+        Binding(
+            get: { openMode },
+            set: { mode in
+                guard let builtIn = BuiltInApp.find(item.applicationID) else { return }
+                let updatedTemplate = builtIn.command(for: mode)
+                openMode = mode
+                template = updatedTemplate
+                commit(template: updatedTemplate, openMode: mode)
+            }
+        )
+    }
+
+    private func commit(template: String? = nil, openMode: OpenMode? = nil) {
         onUpdate(MenuItemConfig(
             id: item.id,
             name: name,
             actionType: actionType,
             applicationID: item.applicationID,
-            template: template,
+            template: template ?? self.template,
+            openMode: openMode ?? (supportsOpenModeSelection ? self.openMode : item.openMode),
             showInContextMenu: item.showInContextMenu,
             showInToolbarMenu: item.showInToolbarMenu
         ))

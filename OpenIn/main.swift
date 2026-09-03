@@ -79,7 +79,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         launchedViaURL = true
-        let command = MenuConfigStore.resolve(item.template, path: MenuConfigStore.shellQuoted(request.path))
+        let command = MenuConfigStore.resolve(
+            item.template,
+            path: MenuConfigStore.shellQuoted(request.path),
+            urlPath: MenuConfigStore.urlEncodedPath(request.path)
+        )
         executeShellCommand(command)
     }
 
