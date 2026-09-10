@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <title>OpenIn</title>
-  <desc>Native-style arrow.up.forward symbol in black on a white background.</desc>
+  <desc>Native-style arrowshape.turn.up.right.fill symbol in black on a white background.</desc>
   <rect width="1024" height="1024" rx="210" fill="#FFFFFF"/>
-  <path d="M220 784 784 220M520 220h264v264" fill="none" stroke="#111111" stroke-width="110" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M185 790C185 550 335 366 522 366V230c0-21 25-32 40-18l288 269c18 17 18 45 0 62L562 812c-15 14-40 3-40-18V660h-1c-120 0-231 60-282 152-11 19-54 14-54-22Z" fill="#111111"/>
 </svg>
