@@ -291,7 +291,7 @@ struct MenuItemRow: View {
                 .help("Show in Finder right-click menu")
 
                 Image(systemName: "arrow.up.forward.app")
-                    .font(.system(size: 16, weight: .regular))
+                    .font(.system(size: 20, weight: .light))
                     .frame(width: 22, height: 22)
                     .foregroundStyle(.secondary)
                     .help("Launch")
@@ -331,7 +331,7 @@ struct MenuItemRow: View {
                     .aspectRatio(contentMode: .fit)
             } else if item.isBuiltInApplication {
                 Image(systemName: "questionmark.circle")
-                    .font(.system(size: 16, weight: .regular))
+                    .font(.system(size: 18, weight: .regular))
                     .foregroundStyle(.secondary)
             } else {
                 Image(systemName: "macwindow")
