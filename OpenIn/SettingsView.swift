@@ -288,8 +288,8 @@ struct MenuItemRow: View {
                 .frame(width: 22, height: 32)
                 .help("Show in Finder right-click menu")
 
-                Image(systemName: "arrowshape.turn.up.right.fill")
-                    .font(.system(size: 16, weight: .ultraLight))
+                Image(systemName: "arrow.up.forward.app")
+                    .font(.system(size: 16, weight: .regular))
                     .frame(width: 22, height: 22)
                     .foregroundStyle(.secondary)
                     .help("Launch")

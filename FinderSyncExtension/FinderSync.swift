@@ -18,10 +18,10 @@ final class FinderSync: FIFinderSync {
     override var toolbarItemImage: NSImage {
         let configuration = NSImage.SymbolConfiguration(
             pointSize: 20,
-            weight: .ultraLight,
+            weight: .light,
             scale: .medium
         )
-        if let symbol = NSImage(systemSymbolName: "arrowshape.turn.up.right.fill", accessibilityDescription: "OpenIn")?.withSymbolConfiguration(configuration) {
+        if let symbol = NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: "OpenIn")?.withSymbolConfiguration(configuration) {
             symbol.isTemplate = true
             return symbol
         }
