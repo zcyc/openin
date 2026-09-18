@@ -233,22 +233,24 @@ struct MenuItemRow: View {
                 .frame(width: 135)
 
                 if supportsOpenModeSelection {
-                    Image(systemName: "macwindow")
-                        .font(.system(size: 16, weight: .regular))
-                        .frame(width: 22, height: 22)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("Open mode")
+                    HStack(spacing: 4) {
+                        Image(systemName: "macwindow")
+                            .font(.system(size: 16, weight: .regular))
+                            .frame(width: 22, height: 22)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Open mode")
 
-                    Picker("Open", selection: openModeBinding) {
-                        ForEach(supportedOpenModes, id: \.self) {
-                            Text($0.rawValue).tag($0)
+                        Picker("", selection: openModeBinding) {
+                            ForEach(supportedOpenModes, id: \.self) {
+                                Text($0.rawValue).tag($0)
+                            }
                         }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .frame(width: 135)
+                        .help("Open in a new window or tab")
+                        .accessibilityLabel("Open mode")
                     }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .frame(width: 135)
-                    .help("Open in a new window or tab")
-                    .accessibilityLabel("Open mode")
                 }
 
                 Spacer(minLength: 0)
