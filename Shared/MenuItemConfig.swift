@@ -155,6 +155,13 @@ struct BuiltInApp: Identifiable, Equatable {
         .init(id: "github-desktop", name: "GitHub Desktop", category: .terminal, bundleIdentifier: "com.github.GitHubClient", command: "open -a \"GitHub Desktop\" {path}"),
         .init(id: "gitkraken", name: "GitKraken", category: .terminal, bundleIdentifier: "com.axosoft.gitkraken", command: "open -na GitKraken --args --path {path}"),
         .init(id: "fork", name: "Fork", category: .terminal, bundleIdentifier: "com.DanPristupov.Fork", command: "open -a Fork {path}"),
+        .init(id: "sourcegit", name: "SourceGit", category: .terminal, bundleIdentifier: "com.sourcegit.app", command: "open -a SourceGit --args {path}"),
+        .init(id: "sourcetree", name: "Sourcetree", category: .terminal, bundleIdentifier: "com.torusknot.SourceTreeNotMAS", command: "open -a Sourcetree {path}"),
+        .init(id: "smartgit", name: "SmartGit", category: .terminal, bundleIdentifier: "com.syntevo.smartgit", command: "open -a SmartGit --args --open {path}"),
+        .init(id: "tower", name: "Tower", category: .terminal, bundleIdentifier: "com.fournova.Tower3", command: "open -a Tower {path}"),
+        .init(id: "sublime-merge", name: "Sublime Merge", category: .terminal, bundleIdentifier: nil, command: "open -a \"Sublime Merge\" --args {path}"),
+        .init(id: "gitup", name: "GitUp", category: .terminal, bundleIdentifier: nil, command: "open -a GitUp {path}"),
+        .init(id: "gittyup", name: "Gittyup", category: .terminal, bundleIdentifier: nil, command: "open -a Gittyup {path}"),
         .init(id: "ghostty", name: "Ghostty", category: .terminal, bundleIdentifier: "com.mitchellh.ghostty", command: "open -a Ghostty {path}"),
         .init(id: "kaku", name: "Kaku", category: .terminal, bundleIdentifier: "fun.tw93.kaku", command: "open -a Kaku {path}"),
         .init(id: "tty7", name: "tty7", category: .terminal, bundleIdentifier: "com.github.tty7", command: "/Applications/tty7.app/Contents/MacOS/tty7 {path}", installationPath: "/Applications/tty7.app/Contents/MacOS/tty7"),
@@ -279,7 +286,21 @@ struct MenuConfigStore {
             return defaultItems(showBuiltInMenus: false)
         }
         let data = try Data(contentsOf: configFile)
-        return try JSONDecoder().decode([MenuItemConfig].self, from: data)
+        let items = try JSONDecoder().decode([MenuItemConfig].self, from: data)
+        let configuredIDs = Set(items.compactMap(\.applicationID))
+        let newBuiltIns = BuiltInApp.all
+            .filter { !configuredIDs.contains($0.id) }
+            .map { builtIn in
+                MenuItemConfig(
+                    name: builtIn.name,
+                    actionType: .shellCommand,
+                    applicationID: builtIn.id,
+                    template: builtIn.command(for: .window),
+                    showInContextMenu: builtIn.isAvailable,
+                    showInToolbarMenu: builtIn.isAvailable
+                )
+            }
+        return items + newBuiltIns
     }
 
     static func bootstrapDefaultsIfNeeded() {
