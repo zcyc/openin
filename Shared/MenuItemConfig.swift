@@ -331,7 +331,7 @@ struct MenuConfigStore {
         }
     }
 
-    static func defaultItems(showBuiltInMenus: Bool = true) -> [MenuItemConfig] {
+    static func defaultItems() -> [MenuItemConfig] {
         BuiltInApp.all.map {
             MenuItemConfig(
                 name: $0.name,
@@ -339,8 +339,8 @@ struct MenuConfigStore {
                 applicationID: $0.id,
                 template: $0.command(for: .window),
                 openMode: $0.supportedOpenModes.isEmpty ? nil : .window,
-                showInContextMenu: showBuiltInMenus && $0.isAvailable,
-                showInToolbarMenu: showBuiltInMenus && $0.isAvailable
+                showInContextMenu: $0.isAvailable,
+                showInToolbarMenu: $0.isAvailable
             )
         }
     }
@@ -361,8 +361,8 @@ struct MenuConfigStore {
 
     static func resolve(_ template: String, path: String, urlPath: String? = nil) -> String {
         template
-            .replacingOccurrences(of: pathPlaceholder, with: path)
             .replacingOccurrences(of: urlPathPlaceholder, with: urlPath ?? path)
+            .replacingOccurrences(of: pathPlaceholder, with: path)
     }
 
     static func urlEncodedPath(_ path: String) -> String {

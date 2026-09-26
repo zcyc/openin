@@ -50,32 +50,33 @@ final class FinderSync: FIFinderSync {
         default: menuKindTag = 0
         }
 
-        for (index, item) in visibleItems.enumerated() {
+        for item in visibleItems {
             let menuItem = NSMenuItem(
                 title: item.name,
                 action: #selector(menuItemAction(_:)),
                 keyEquivalent: ""
             )
-            menuItem.tag = menuKindTag * 1000 + index
+            menuItem.tag = menuKindTag
+            menuItem.representedObject = item.id
             menu.addItem(menuItem)
         }
         return menu
     }
 
     @IBAction func menuItemAction(_ sender: NSMenuItem) {
-        let menuIndex = sender.tag % 1000
         let menuKind: FIMenuKind
-        switch sender.tag / 1000 {
+        switch sender.tag {
         case 1: menuKind = .contextualMenuForContainer
         case 2: menuKind = .contextualMenuForSidebar
         case 3: menuKind = .toolbarItemMenu
         case 0: menuKind = .contextualMenuForItems
         default: return
         }
+        guard let itemID = sender.representedObject as? UUID else { return }
         guard let items = try? MenuConfigStore.load() else { return }
-        let visibleItems = items.filter { $0.isVisible(inToolbarMenu: menuKind == .toolbarItemMenu) }
-        guard visibleItems.indices.contains(menuIndex) else { return }
-        let item = visibleItems[menuIndex]
+        guard let item = items.first(where: {
+            $0.id == itemID && $0.isVisible(inToolbarMenu: menuKind == .toolbarItemMenu)
+        }) else { return }
         guard let path = currentPath(for: menuKind) else { return }
 
         switch item.actionType {
