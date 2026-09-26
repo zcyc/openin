@@ -218,7 +218,7 @@ struct MenuItemRow: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 135)
 
-                Image(systemName: "terminal")
+                Image(systemName: actionType == .urlScheme ? "link" : "terminal")
                     .font(.system(size: 16))
                     .frame(width: 22, height: 22)
                     .foregroundStyle(.secondary)
@@ -412,7 +412,9 @@ struct AddItemSheet: View {
             .textFieldStyle(.roundedBorder)
             .font(.system(.body, design: .monospaced))
 
-            Text("{path} is replaced with the current Finder directory. Shell paths are safely quoted.")
+            Text(actionType == .shellCommand
+                ? "{path} is replaced with the current Finder directory. Shell paths are safely quoted."
+                : "{path} is replaced with the current Finder directory and URL-encoded.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
