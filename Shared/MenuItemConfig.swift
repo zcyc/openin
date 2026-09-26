@@ -86,7 +86,7 @@ struct BuiltInApp: Identifiable, Equatable {
 
     var supportedOpenModes: [OpenMode] {
         switch id {
-        case "terminal", "iterm", "kitty", "wezterm", "warp", "ghostty", "cmux":
+        case "terminal", "iterm", "wezterm", "warp", "ghostty", "cmux":
             return OpenMode.allCases
         default:
             return []
@@ -108,13 +108,6 @@ struct BuiltInApp: Identifiable, Equatable {
                 return "osascript -e 'on run argv' -e 'set myCommand to \"cd \" & quoted form of (item 1 of argv)' -e 'tell application \"iTerm2\" to create window with default profile command myCommand' -e 'end run' -- {path}"
             case .tab:
                 return "osascript -e 'on run argv' -e 'set myCommand to \"cd \" & quoted form of (item 1 of argv)' -e 'tell application \"iTerm2\"' -e 'if (count of windows) = 0 then' -e 'create window with default profile command myCommand' -e 'else' -e 'tell current window to create tab with default profile command myCommand' -e 'end if' -e 'end tell' -e 'end run' -- {path}"
-            }
-        case "kitty":
-            switch mode {
-            case .window:
-                return command
-            case .tab:
-                return "kitten @ launch --type=tab --cwd {path}"
             }
         case "wezterm":
             return mode == .tab
@@ -292,12 +285,14 @@ struct MenuConfigStore {
         let path: String
     }
 
+    private static let unsupportedKittyTabTemplate = "kitten @ launch --type=tab --cwd {path}"
+
     static func load() throws -> [MenuItemConfig] {
         guard FileManager.default.fileExists(atPath: configFile.path) else {
             return defaultItems()
         }
         let data = try Data(contentsOf: configFile)
-        let items = try JSONDecoder().decode([MenuItemConfig].self, from: data)
+        let items = normalizeUnsupportedModes(try JSONDecoder().decode([MenuItemConfig].self, from: data))
         let configuredIDs = Set(items.compactMap(\.applicationID))
         let newBuiltIns = BuiltInApp.all
             .filter { !configuredIDs.contains($0.id) }
@@ -312,6 +307,20 @@ struct MenuConfigStore {
                 )
             }
         return items + newBuiltIns
+    }
+
+    static func normalizeUnsupportedModes(_ items: [MenuItemConfig]) -> [MenuItemConfig] {
+        guard let kitty = BuiltInApp.find("kitty") else { return items }
+        return items.map { item in
+            guard item.applicationID == kitty.id,
+                  item.actionType == .shellCommand,
+                  item.openMode == .tab,
+                  item.template == unsupportedKittyTabTemplate else { return item }
+            var updated = item
+            updated.openMode = nil
+            updated.template = kitty.command
+            return updated
+        }
     }
 
     static func bootstrapDefaultsIfNeeded() {
