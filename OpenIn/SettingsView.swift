@@ -21,11 +21,11 @@ struct SettingsView: View {
     @State private var didLoadItems = false
 
     private var contextMenuCount: Int {
-        items.filter(\.showInContextMenu).count
+        items.filter { $0.isVisible(inToolbarMenu: false) }.count
     }
 
     private var toolbarMenuCount: Int {
-        items.filter(\.showInToolbarMenu).count
+        items.filter { $0.isVisible(inToolbarMenu: true) }.count
     }
 
     private var visibleItems: [MenuItemConfig] {

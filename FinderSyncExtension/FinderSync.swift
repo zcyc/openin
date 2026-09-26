@@ -38,9 +38,7 @@ final class FinderSync: FIFinderSync {
 
         let showsInToolbar = menuKind == .toolbarItemMenu
         guard let items = try? MenuConfigStore.load() else { return nil }
-        let visibleItems = items.filter {
-            showsInToolbar ? $0.showInToolbarMenu : $0.showInContextMenu
-        }
+        let visibleItems = items.filter { $0.isVisible(inToolbarMenu: showsInToolbar) }
         let menu = NSMenu(title: "OpenIn")
         guard !visibleItems.isEmpty else { return nil }
 
@@ -75,9 +73,7 @@ final class FinderSync: FIFinderSync {
         default: return
         }
         guard let items = try? MenuConfigStore.load() else { return }
-        let visibleItems = items.filter {
-            menuKind == .toolbarItemMenu ? $0.showInToolbarMenu : $0.showInContextMenu
-        }
+        let visibleItems = items.filter { $0.isVisible(inToolbarMenu: menuKind == .toolbarItemMenu) }
         guard visibleItems.indices.contains(menuIndex) else { return }
         let item = visibleItems[menuIndex]
         guard let path = currentPath(for: menuKind) else { return }

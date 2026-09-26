@@ -62,6 +62,11 @@ struct BuiltInApp: Identifiable, Equatable {
             }
         }
 
+        if let bundleIdentifier,
+           let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            return applicationURL.path
+        }
+
         let fileManager = FileManager.default
         let homeApplications = fileManager.homeDirectoryForCurrentUser
             .appendingPathComponent("Applications")
@@ -238,6 +243,12 @@ struct MenuItemConfig: Codable, Identifiable, Equatable {
         applicationID != nil
     }
 
+    func isVisible(inToolbarMenu: Bool) -> Bool {
+        let isEnabled = inToolbarMenu ? showInToolbarMenu : showInContextMenu
+        let isAvailable = !isBuiltInApplication || BuiltInApp.find(applicationID)?.isAvailable == true
+        return isEnabled && isAvailable
+    }
+
     var menuIdentifier: String {
         applicationID ?? id.uuidString
     }
@@ -283,7 +294,7 @@ struct MenuConfigStore {
 
     static func load() throws -> [MenuItemConfig] {
         guard FileManager.default.fileExists(atPath: configFile.path) else {
-            return defaultItems(showBuiltInMenus: false)
+            return defaultItems()
         }
         let data = try Data(contentsOf: configFile)
         let items = try JSONDecoder().decode([MenuItemConfig].self, from: data)
@@ -308,7 +319,7 @@ struct MenuConfigStore {
               !FileManager.default.fileExists(atPath: configFile.path) else {
             return
         }
-        save(defaultItems(showBuiltInMenus: false))
+        save(defaultItems())
     }
 
     static func save(_ items: [MenuItemConfig]) {
