@@ -91,6 +91,18 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = ["-c", command]
+        var environment = ProcessInfo.processInfo.environment
+        let inheritedPath = (environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin")
+            .split(separator: ":")
+            .map(String.init)
+        // Finder-launched apps do not inherit paths configured only in shell startup files.
+        environment["PATH"] = (inheritedPath + [
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            NSHomeDirectory() + "/.local/bin"
+        ])
+            .joined(separator: ":")
+        process.environment = environment
         do {
             try process.run()
         } catch {
