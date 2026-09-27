@@ -15,6 +15,12 @@ struct MenuItemConfigCheck {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
         assert(BuiltInApp.find("rio")!.resolveInstallationPath(in: app.path) == executable.path)
         assert(BuiltInApp.find("terminal")!.resolvedInstallationPath == nil)
+        assert(BuiltInApp.find("rio")!.bundleIdentifier == "com.raphaelamorim.rio")
+        let ottyCLI = root.appendingPathComponent("bin/otty")
+        try FileManager.default.createDirectory(at: ottyCLI.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: ottyCLI)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: ottyCLI.path)
+        assert(BuiltInApp.firstExecutable(in: ["/missing/otty", ottyCLI.path]) == ottyCLI.path)
 
         let resolvedCommand = MenuConfigStore.resolve(
             "{applicationPath} --working-dir {path}",

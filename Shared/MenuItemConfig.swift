@@ -50,26 +50,48 @@ struct BuiltInApp: Identifiable, Equatable {
 
     var resolvedInstallationPath: String? {
         guard installationPath != nil else { return nil }
+        if id == "otty", let cliPath = Self.firstExecutable(in: Self.ottyCLIPaths) {
+            return cliPath
+        }
         return resolveInstallationPath(in: applicationBundlePath)
     }
 
     func resolveInstallationPath(in applicationBundlePath: String?) -> String? {
         guard let installationPath else { return nil }
         let fileManager = FileManager.default
-        if fileManager.isExecutableFile(atPath: installationPath) { return installationPath }
         let installationComponents = URL(fileURLWithPath: installationPath).pathComponents
-        guard let applicationBundlePath,
-              let appIndex = installationComponents.firstIndex(where: { $0.hasSuffix(".app") }) else { return nil }
-        let relativeComponents = installationComponents.dropFirst(appIndex + 1)
-        guard !relativeComponents.isEmpty else { return nil }
-        let resolvedURL = relativeComponents.reduce(URL(fileURLWithPath: applicationBundlePath)) {
-            $0.appendingPathComponent($1)
+        if let applicationBundlePath,
+           let appIndex = installationComponents.firstIndex(where: { $0.hasSuffix(".app") }) {
+            let relativeComponents = installationComponents.dropFirst(appIndex + 1)
+            if !relativeComponents.isEmpty {
+                let resolvedURL = relativeComponents.reduce(URL(fileURLWithPath: applicationBundlePath)) {
+                    $0.appendingPathComponent($1)
+                }
+                if fileManager.isExecutableFile(atPath: resolvedURL.path) { return resolvedURL.path }
+            }
         }
-        let resolvedPath = resolvedURL.path
-        return fileManager.isExecutableFile(atPath: resolvedPath) ? resolvedPath : nil
+        return fileManager.isExecutableFile(atPath: installationPath) ? installationPath : nil
+    }
+
+    static func firstExecutable(in paths: [String]) -> String? {
+        paths.first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    private static var ottyCLIPaths: [String] {
+        let inherited = (ProcessInfo.processInfo.environment["PATH"] ?? "")
+            .split(separator: ":")
+            .map(String.init)
+            .filter { $0.hasPrefix("/") }
+        return (inherited + ["/opt/homebrew/bin", "/usr/local/bin", NSHomeDirectory() + "/.local/bin"])
+            .map { URL(fileURLWithPath: $0).appendingPathComponent("otty").path }
     }
 
     var applicationBundlePath: String? {
+        if let bundleIdentifier,
+           let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            return applicationURL.path
+        }
+
         if let installationPath {
             var url = URL(fileURLWithPath: installationPath)
             while url.path != "/" {
@@ -78,11 +100,6 @@ struct BuiltInApp: Identifiable, Equatable {
                 }
                 url.deleteLastPathComponent()
             }
-        }
-
-        if let bundleIdentifier,
-           let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
-            return applicationURL.path
         }
 
         let fileManager = FileManager.default
@@ -164,7 +181,7 @@ struct BuiltInApp: Identifiable, Equatable {
         .init(id: "alacritty", name: "Alacritty", category: .terminal, bundleIdentifier: "io.alacritty", command: "open -na Alacritty --args --working-directory {path}"),
         .init(id: "kitty", name: "kitty", category: .terminal, bundleIdentifier: "net.kovidgoyal.kitty", command: "open -na kitty --args --single-instance --instance-group 1 --directory {path}"),
         .init(id: "wezterm", name: "WezTerm", category: .terminal, bundleIdentifier: "com.github.wez.wezterm", command: "open -na wezterm --args start --cwd {path}"),
-        .init(id: "rio", name: "Rio", category: .terminal, bundleIdentifier: nil, command: "{applicationPath} --working-dir {path}", installationPath: "/Applications/Rio.app/Contents/MacOS/rio"),
+        .init(id: "rio", name: "Rio", category: .terminal, bundleIdentifier: "com.raphaelamorim.rio", command: "{applicationPath} --working-dir {path}", installationPath: "/Applications/Rio.app/Contents/MacOS/rio"),
         .init(id: "tabby", name: "Tabby", category: .terminal, bundleIdentifier: "org.tabby", command: "open -na tabby --args --directory {path}"),
         .init(id: "warp", name: "Warp", category: .terminal, bundleIdentifier: "dev.warp", command: "open -a Warp {path}"),
         .init(id: "cmux", name: "cmux", category: .terminal, bundleIdentifier: "com.cmuxterm.app", command: "open -a cmux {path}"),
