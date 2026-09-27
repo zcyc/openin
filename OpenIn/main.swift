@@ -79,10 +79,21 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         launchedViaURL = true
+        let applicationPath: String?
+        if item.template.contains(MenuConfigStore.applicationPathPlaceholder) {
+            guard let resolvedPath = BuiltInApp.find(item.applicationID)?.resolvedInstallationPath else {
+                NSLog("[OpenIn] built-in application is unavailable: %@", item.applicationID ?? "unknown")
+                return
+            }
+            applicationPath = resolvedPath
+        } else {
+            applicationPath = nil
+        }
         let command = MenuConfigStore.resolve(
             item.template,
             path: MenuConfigStore.shellQuoted(request.path),
-            urlPath: MenuConfigStore.urlEncodedPath(request.path)
+            urlPath: MenuConfigStore.urlEncodedPath(request.path),
+            applicationPath: applicationPath
         )
         executeShellCommand(command)
     }

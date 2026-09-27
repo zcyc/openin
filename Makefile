@@ -16,7 +16,7 @@ INSTALL_APP := $(INSTALL_DIR)/$(APP_NAME).app
 
 SWIFTC_FLAGS := -module-cache-path "$(MODULE_CACHE)" -sdk "$(SDK_PATH)" -target "$(TARGET)"
 
-.PHONY: build sign check package dmg install clean
+.PHONY: build sign check test package dmg install clean
 
 build:
 	mkdir -p "$(APP)/Contents/MacOS" "$(APP)/Contents/Resources" "$(EXTENSION)/Contents/MacOS" "$(EXTENSION)/Contents/Resources"
@@ -45,8 +45,13 @@ sign: build
 	codesign --force --sign - --entitlements OpenIn/OpenIn.entitlements "$(APP)"
 	codesign --verify --deep --strict --verbose=1 "$(APP)"
 
-check: sign
+check: test sign
 	git diff --check
+
+test:
+	mkdir -p "$(BUILD_DIR)"
+	swiftc $(SWIFTC_FLAGS) -framework AppKit Shared/MenuItemConfig.swift Tests/MenuItemConfigCheck.swift -o "$(BUILD_DIR)/MenuItemConfigCheck"
+	"$(BUILD_DIR)/MenuItemConfigCheck"
 
 package: sign
 	rm -f "$(PACKAGE)"

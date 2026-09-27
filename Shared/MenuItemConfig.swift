@@ -44,18 +44,36 @@ struct BuiltInApp: Identifiable, Equatable {
         if id == "neovim" {
             return nvimPath != nil && BuiltInApp.find("kitty")?.isAvailable == true
         }
-        let fileManager = FileManager.default
-        if let installationPath {
-            return fileManager.isExecutableFile(atPath: installationPath)
-        }
+        if installationPath != nil { return resolvedInstallationPath != nil }
         return applicationBundlePath != nil
+    }
+
+    var resolvedInstallationPath: String? {
+        guard installationPath != nil else { return nil }
+        return resolveInstallationPath(in: applicationBundlePath)
+    }
+
+    func resolveInstallationPath(in applicationBundlePath: String?) -> String? {
+        guard let installationPath else { return nil }
+        let fileManager = FileManager.default
+        if fileManager.isExecutableFile(atPath: installationPath) { return installationPath }
+        let installationComponents = URL(fileURLWithPath: installationPath).pathComponents
+        guard let applicationBundlePath,
+              let appIndex = installationComponents.firstIndex(where: { $0.hasSuffix(".app") }) else { return nil }
+        let relativeComponents = installationComponents.dropFirst(appIndex + 1)
+        guard !relativeComponents.isEmpty else { return nil }
+        let resolvedURL = relativeComponents.reduce(URL(fileURLWithPath: applicationBundlePath)) {
+            $0.appendingPathComponent($1)
+        }
+        let resolvedPath = resolvedURL.path
+        return fileManager.isExecutableFile(atPath: resolvedPath) ? resolvedPath : nil
     }
 
     var applicationBundlePath: String? {
         if let installationPath {
             var url = URL(fileURLWithPath: installationPath)
             while url.path != "/" {
-                if url.pathExtension == "app" {
+                if url.pathExtension == "app", FileManager.default.fileExists(atPath: url.path) {
                     return url.path
                 }
                 url.deleteLastPathComponent()
@@ -146,7 +164,7 @@ struct BuiltInApp: Identifiable, Equatable {
         .init(id: "alacritty", name: "Alacritty", category: .terminal, bundleIdentifier: "io.alacritty", command: "open -na Alacritty --args --working-directory {path}"),
         .init(id: "kitty", name: "kitty", category: .terminal, bundleIdentifier: "net.kovidgoyal.kitty", command: "open -na kitty --args --single-instance --instance-group 1 --directory {path}"),
         .init(id: "wezterm", name: "WezTerm", category: .terminal, bundleIdentifier: "com.github.wez.wezterm", command: "open -na wezterm --args start --cwd {path}"),
-        .init(id: "rio", name: "Rio", category: .terminal, bundleIdentifier: nil, command: "/Applications/Rio.app/Contents/MacOS/rio --working-dir {path}", installationPath: "/Applications/Rio.app/Contents/MacOS/rio"),
+        .init(id: "rio", name: "Rio", category: .terminal, bundleIdentifier: nil, command: "{applicationPath} --working-dir {path}", installationPath: "/Applications/Rio.app/Contents/MacOS/rio"),
         .init(id: "tabby", name: "Tabby", category: .terminal, bundleIdentifier: "org.tabby", command: "open -na tabby --args --directory {path}"),
         .init(id: "warp", name: "Warp", category: .terminal, bundleIdentifier: "dev.warp", command: "open -a Warp {path}"),
         .init(id: "cmux", name: "cmux", category: .terminal, bundleIdentifier: "com.cmuxterm.app", command: "open -a cmux {path}"),
@@ -162,8 +180,8 @@ struct BuiltInApp: Identifiable, Equatable {
         .init(id: "gittyup", name: "Gittyup", category: .terminal, bundleIdentifier: nil, command: "open -a Gittyup {path}"),
         .init(id: "ghostty", name: "Ghostty", category: .terminal, bundleIdentifier: "com.mitchellh.ghostty", command: "open -a Ghostty {path}"),
         .init(id: "kaku", name: "Kaku", category: .terminal, bundleIdentifier: "fun.tw93.kaku", command: "open -a Kaku {path}"),
-        .init(id: "tty7", name: "tty7", category: .terminal, bundleIdentifier: "com.github.tty7", command: "/Applications/tty7.app/Contents/MacOS/tty7 {path}", installationPath: "/Applications/tty7.app/Contents/MacOS/tty7"),
-        .init(id: "otty", name: "Otty", category: .terminal, bundleIdentifier: nil, command: "/Applications/Otty.app/Contents/MacOS/otty-cli open {path}", installationPath: "/Applications/Otty.app/Contents/MacOS/otty-cli"),
+        .init(id: "tty7", name: "tty7", category: .terminal, bundleIdentifier: "com.github.tty7", command: "{applicationPath} {path}", installationPath: "/Applications/tty7.app/Contents/MacOS/tty7"),
+        .init(id: "otty", name: "Otty", category: .terminal, bundleIdentifier: nil, command: "{applicationPath} open {path}", installationPath: "/Applications/Otty.app/Contents/MacOS/otty-cli"),
         .init(id: "muxy", name: "Muxy", category: .terminal, bundleIdentifier: "com.muxy.app", command: "open -a Muxy {path}"),
         .init(id: "kooky", name: "kooky", category: .terminal, bundleIdentifier: "com.iamcorey.kooky", command: "\"$HOME/Library/Application Support/kooky/bin/kooky-cli\" open --cwd {path}", installationPath: NSHomeDirectory() + "/Library/Application Support/kooky/bin/kooky-cli"),
         .init(id: "herdr", name: "herdr", category: .terminal, bundleIdentifier: nil, command: "\"$HOME/.local/bin/herdr\" workspace create --cwd {path} --focus", installationPath: NSHomeDirectory() + "/.local/bin/herdr"),
@@ -259,6 +277,7 @@ struct MenuConfigStore {
     static let extensionBundleID = "com.local.OpenIn.FinderSync"
     static let pathPlaceholder = "{path}"
     static let urlPathPlaceholder = "{urlPath}"
+    static let applicationPathPlaceholder = "{applicationPath}"
 
     static let sharedDirectory: URL = {
         let base: URL
@@ -285,14 +304,19 @@ struct MenuConfigStore {
         let path: String
     }
 
-    private static let unsupportedKittyTabTemplate = "kitten @ launch --type=tab --cwd {path}"
+    private static let obsoleteBuiltInTemplates = [
+        "kitty": "kitten @ launch --type=tab --cwd {path}",
+        "rio": "/Applications/Rio.app/Contents/MacOS/rio --working-dir {path}",
+        "tty7": "/Applications/tty7.app/Contents/MacOS/tty7 {path}",
+        "otty": "/Applications/Otty.app/Contents/MacOS/otty-cli open {path}"
+    ]
 
     static func load() throws -> [MenuItemConfig] {
         guard FileManager.default.fileExists(atPath: configFile.path) else {
             return defaultItems()
         }
         let data = try Data(contentsOf: configFile)
-        let items = normalizeUnsupportedModes(try JSONDecoder().decode([MenuItemConfig].self, from: data))
+        let items = normalizeBuiltInTemplates(try JSONDecoder().decode([MenuItemConfig].self, from: data))
         let configuredIDs = Set(items.compactMap(\.applicationID))
         let newBuiltIns = BuiltInApp.all
             .filter { !configuredIDs.contains($0.id) }
@@ -309,16 +333,16 @@ struct MenuConfigStore {
         return items + newBuiltIns
     }
 
-    static func normalizeUnsupportedModes(_ items: [MenuItemConfig]) -> [MenuItemConfig] {
-        guard let kitty = BuiltInApp.find("kitty") else { return items }
+    static func normalizeBuiltInTemplates(_ items: [MenuItemConfig]) -> [MenuItemConfig] {
         return items.map { item in
-            guard item.applicationID == kitty.id,
+            guard let applicationID = item.applicationID,
+                  let obsoleteTemplate = obsoleteBuiltInTemplates[applicationID],
                   item.actionType == .shellCommand,
-                  item.openMode == .tab,
-                  item.template == unsupportedKittyTabTemplate else { return item }
+                  item.template == obsoleteTemplate,
+                  let builtIn = BuiltInApp.find(applicationID) else { return item }
             var updated = item
-            updated.openMode = nil
-            updated.template = kitty.command
+            updated.template = builtIn.command(for: .window)
+            if applicationID == "kitty" { updated.openMode = nil }
             return updated
         }
     }
@@ -368,10 +392,28 @@ struct MenuConfigStore {
         )
     }
 
-    static func resolve(_ template: String, path: String, urlPath: String? = nil) -> String {
-        template
-            .replacingOccurrences(of: urlPathPlaceholder, with: urlPath ?? path)
-            .replacingOccurrences(of: pathPlaceholder, with: path)
+    static func resolve(
+        _ template: String,
+        path: String,
+        urlPath: String? = nil,
+        applicationPath: String? = nil
+    ) -> String {
+        let replacements = [
+            urlPathPlaceholder: urlPath ?? path,
+            pathPlaceholder: path,
+            applicationPathPlaceholder: applicationPath.map(shellQuoted) ?? applicationPathPlaceholder
+        ]
+        var result = ""
+        var cursor = template.startIndex
+        while let start = template[cursor...].firstIndex(of: "{"),
+              let end = template[template.index(after: start)...].firstIndex(of: "}") {
+            result += template[cursor..<start]
+            let placeholder = String(template[start...end])
+            result += replacements[placeholder] ?? placeholder
+            cursor = template.index(after: end)
+        }
+        result += template[cursor...]
+        return result
     }
 
     static func urlEncodedPath(_ path: String) -> String {
