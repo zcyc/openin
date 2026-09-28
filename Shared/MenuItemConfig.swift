@@ -16,6 +16,17 @@ enum AppCategory: String, Codable {
     case editor = "Editor"
 }
 
+enum FinderMenuTag {
+    static func encode(menuKind: Int, itemIndex: Int) -> Int {
+        itemIndex * 4 + menuKind
+    }
+
+    static func decode(_ tag: Int) -> (menuKind: Int, itemIndex: Int)? {
+        guard tag >= 0 else { return nil }
+        return (tag % 4, tag / 4)
+    }
+}
+
 struct BuiltInApp: Identifiable, Equatable {
     let id: String
     let name: String
@@ -87,6 +98,8 @@ struct BuiltInApp: Identifiable, Equatable {
     }
 
     var applicationBundlePath: String? {
+        if id == "neovim" { return Self.find("kitty")?.applicationBundlePath }
+
         if let bundleIdentifier,
            let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
             return applicationURL.path
@@ -168,6 +181,26 @@ struct BuiltInApp: Identifiable, Equatable {
         }
     }
 
+    func workspaceArguments(for path: String, mode: OpenMode) -> [String]? {
+        switch id {
+        case "alacritty": return ["--working-directory", path]
+        case "kitty": return ["--single-instance", "--instance-group", "1", "--directory", path]
+        case "wezterm": return mode == .tab
+            ? ["start", "--new-tab", "--cwd", path]
+            : ["start", "--cwd", path]
+        case "tabby": return ["--directory", path]
+        case "gitkraken": return ["--path", path]
+        case "sourcegit", "sublime-merge": return [path]
+        case "smartgit": return ["--open", path]
+        case "neovim": return nvimPath.map { [$0, path] }
+        default: return nil
+        }
+    }
+
+    var requiresNewInstanceForWorkspaceArguments: Bool {
+        ["alacritty", "kitty", "wezterm", "tabby", "gitkraken", "neovim"].contains(id)
+    }
+
     private var nvimPath: String? {
         let fileManager = FileManager.default
         return ["/opt/homebrew/bin/nvim", "/usr/local/bin/nvim"]
@@ -188,7 +221,7 @@ struct BuiltInApp: Identifiable, Equatable {
         .init(id: "github-desktop", name: "GitHub Desktop", category: .terminal, bundleIdentifier: "com.github.GitHubClient", command: "open -a \"GitHub Desktop\" {path}"),
         .init(id: "gitkraken", name: "GitKraken", category: .terminal, bundleIdentifier: "com.axosoft.gitkraken", command: "open -na GitKraken --args --path {path}"),
         .init(id: "fork", name: "Fork", category: .terminal, bundleIdentifier: "com.DanPristupov.Fork", command: "open -a Fork {path}"),
-        .init(id: "sourcegit", name: "SourceGit", category: .terminal, bundleIdentifier: "com.sourcegit.app", command: "open -a SourceGit --args {path}"),
+        .init(id: "sourcegit", name: "SourceGit", category: .terminal, bundleIdentifier: "com.sourcegit-scm.sourcegit", command: "open -a SourceGit --args {path}"),
         .init(id: "sourcetree", name: "Sourcetree", category: .terminal, bundleIdentifier: "com.torusknot.SourceTreeNotMAS", command: "open -a Sourcetree {path}"),
         .init(id: "smartgit", name: "SmartGit", category: .terminal, bundleIdentifier: "com.syntevo.smartgit", command: "open -a SmartGit --args --open {path}"),
         .init(id: "tower", name: "Tower", category: .terminal, bundleIdentifier: "com.fournova.Tower3", command: "open -a Tower {path}"),
@@ -198,7 +231,7 @@ struct BuiltInApp: Identifiable, Equatable {
         .init(id: "ghostty", name: "Ghostty", category: .terminal, bundleIdentifier: "com.mitchellh.ghostty", command: "open -a Ghostty {path}"),
         .init(id: "kaku", name: "Kaku", category: .terminal, bundleIdentifier: "fun.tw93.kaku", command: "open -a Kaku {path}"),
         .init(id: "tty7", name: "tty7", category: .terminal, bundleIdentifier: "com.github.tty7", command: "{applicationPath} {path}", installationPath: "/Applications/tty7.app/Contents/MacOS/tty7"),
-        .init(id: "otty", name: "Otty", category: .terminal, bundleIdentifier: nil, command: "{applicationPath} open {path}", installationPath: "/Applications/Otty.app/Contents/MacOS/otty-cli"),
+        .init(id: "otty", name: "Otty", category: .terminal, bundleIdentifier: "io.appmakes.otty", command: "{applicationPath} open {path}", installationPath: "/Applications/Otty.app/Contents/MacOS/otty-cli"),
         .init(id: "muxy", name: "Muxy", category: .terminal, bundleIdentifier: "com.muxy.app", command: "open -a Muxy {path}"),
         .init(id: "kooky", name: "kooky", category: .terminal, bundleIdentifier: "com.iamcorey.kooky", command: "\"$HOME/Library/Application Support/kooky/bin/kooky-cli\" open --cwd {path}", installationPath: NSHomeDirectory() + "/Library/Application Support/kooky/bin/kooky-cli"),
         .init(id: "herdr", name: "herdr", category: .terminal, bundleIdentifier: nil, command: "\"$HOME/.local/bin/herdr\" workspace create --cwd {path} --focus", installationPath: NSHomeDirectory() + "/.local/bin/herdr"),
@@ -319,6 +352,7 @@ struct MenuConfigStore {
     private struct ShellRequest: Codable {
         let itemIdentifier: String
         let path: String
+        let createdAt: Date
     }
 
     private static let obsoleteBuiltInTemplates = [
@@ -443,12 +477,13 @@ struct MenuConfigStore {
         "'\(path.replacingOccurrences(of: "'", with: "'\\''"))'"
     }
 
-    static func createShellRequest(itemIdentifier: String, path: String) -> String? {
+    static func createShellRequest(itemIdentifier: String, path: String, in directory: URL? = nil) -> String? {
         let requestID = UUID().uuidString
-        let requestURL = shellRequestDirectory.appendingPathComponent(requestID).appendingPathExtension("json")
+        let directory = directory ?? shellRequestDirectory
+        let requestURL = directory.appendingPathComponent(requestID).appendingPathExtension("json")
         do {
-            try FileManager.default.createDirectory(at: shellRequestDirectory, withIntermediateDirectories: true)
-            let request = ShellRequest(itemIdentifier: itemIdentifier, path: path)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let request = ShellRequest(itemIdentifier: itemIdentifier, path: path, createdAt: Date())
             let data = try JSONEncoder().encode(request)
             try data.write(to: requestURL, options: .atomic)
             return requestID
@@ -458,22 +493,37 @@ struct MenuConfigStore {
         }
     }
 
-    static func consumeShellRequest(_ requestID: String) -> (itemIdentifier: String, path: String)? {
+    static func consumePendingShellRequests(in directory: URL? = nil) -> [(itemIdentifier: String, path: String)] {
+        let directory = directory ?? shellRequestDirectory
+        guard let requestURLs = try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil
+        ) else { return [] }
+
+        return requestURLs
+            .filter { $0.pathExtension == "json" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+            .compactMap { requestURL in
+                let requestID = requestURL.deletingPathExtension().lastPathComponent
+                return consumeShellRequest(requestID, in: directory)
+            }
+    }
+
+    static func consumeShellRequest(
+        _ requestID: String,
+        in directory: URL? = nil
+    ) -> (itemIdentifier: String, path: String)? {
         guard UUID(uuidString: requestID) != nil else { return nil }
-        let requestURL = shellRequestDirectory.appendingPathComponent(requestID).appendingPathExtension("json")
-        defer { try? FileManager.default.removeItem(at: requestURL) }
-        guard let data = try? Data(contentsOf: requestURL),
+        let directory = directory ?? shellRequestDirectory
+        let requestURL = directory.appendingPathComponent(requestID).appendingPathExtension("json")
+        let claimedURL = directory.appendingPathComponent("\(requestID).processing")
+        guard (try? FileManager.default.moveItem(at: requestURL, to: claimedURL)) != nil else { return nil }
+        defer { try? FileManager.default.removeItem(at: claimedURL) }
+        guard let data = try? Data(contentsOf: claimedURL),
               let request = try? JSONDecoder().decode(ShellRequest.self, from: data) else {
             return nil
         }
+        guard Date().timeIntervalSince(request.createdAt) <= 30 else { return nil }
         return (request.itemIdentifier, request.path)
-    }
-
-    static func shellURL(for requestID: String) -> URL? {
-        var components = URLComponents()
-        components.scheme = "openin"
-        components.host = "shell"
-        components.queryItems = [URLQueryItem(name: "request", value: requestID)]
-        return components.url
     }
 }

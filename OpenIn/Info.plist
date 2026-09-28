@@ -26,16 +26,5 @@
 	<string>NSApplication</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>OpenIn uses Apple Events to create windows and tabs in supported terminal applications.</string>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>com.local.OpenIn</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>openin</string>
-			</array>
-		</dict>
-	</array>
 </dict>
 </plist>

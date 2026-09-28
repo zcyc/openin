@@ -50,44 +50,65 @@ final class FinderSync: FIFinderSync {
         default: menuKindTag = 0
         }
 
-        for item in visibleItems {
+        for (index, item) in visibleItems.enumerated() {
             let menuItem = NSMenuItem(
                 title: item.name,
                 action: #selector(menuItemAction(_:)),
                 keyEquivalent: ""
             )
-            menuItem.tag = menuKindTag
-            menuItem.representedObject = item.id
+            menuItem.tag = FinderMenuTag.encode(menuKind: menuKindTag, itemIndex: index)
             menu.addItem(menuItem)
         }
         return menu
     }
 
     @IBAction func menuItemAction(_ sender: NSMenuItem) {
+        guard let selection = FinderMenuTag.decode(sender.tag) else {
+            NSLog("[OpenIn] Finder menu action has an invalid tag: %ld", sender.tag)
+            return
+        }
+        NSLog("[OpenIn] Finder menu action received (tag: %ld)", sender.tag)
         let menuKind: FIMenuKind
-        switch sender.tag {
+        switch selection.menuKind {
         case 1: menuKind = .contextualMenuForContainer
         case 2: menuKind = .contextualMenuForSidebar
         case 3: menuKind = .toolbarItemMenu
         case 0: menuKind = .contextualMenuForItems
         default: return
         }
-        guard let itemID = sender.representedObject as? UUID else { return }
-        guard let items = try? MenuConfigStore.load() else { return }
-        guard let item = items.first(where: {
-            $0.id == itemID && $0.isVisible(inToolbarMenu: menuKind == .toolbarItemMenu)
-        }) else { return }
-        guard let path = currentPath(for: menuKind) else { return }
+        guard let items = try? MenuConfigStore.load() else {
+            NSLog("[OpenIn] unable to load menu configuration")
+            return
+        }
+        let visibleItems = items.filter { $0.isVisible(inToolbarMenu: menuKind == .toolbarItemMenu) }
+        guard visibleItems.indices.contains(selection.itemIndex) else {
+            NSLog("[OpenIn] Finder menu item index is no longer available: %ld", selection.itemIndex)
+            return
+        }
+        let item = visibleItems[selection.itemIndex]
+        guard let path = currentPath(for: menuKind) else {
+            NSLog("[OpenIn] Finder did not provide a target path (tag: %ld)", sender.tag)
+            return
+        }
 
         switch item.actionType {
         case .shellCommand:
-            guard let requestID = MenuConfigStore.createShellRequest(itemIdentifier: item.menuIdentifier, path: path),
-                  let url = MenuConfigStore.shellURL(for: requestID) else { return }
-            guard NSWorkspace.shared.open(url) else {
-                NSLog("[OpenIn] unable to open shell request URL for %@", item.menuIdentifier)
-                return
+            guard let requestID = MenuConfigStore.createShellRequest(itemIdentifier: item.menuIdentifier, path: path) else { return }
+            let applicationURL = Bundle.main.bundleURL
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = false
+            configuration.createsNewApplicationInstance = true
+            NSWorkspace.shared.openApplication(at: applicationURL, configuration: configuration) { _, error in
+                if let error {
+                    _ = MenuConfigStore.consumeShellRequest(requestID)
+                    NSLog("[OpenIn] unable to dispatch shell request for %@: %@", item.menuIdentifier, error.localizedDescription)
+                } else {
+                    NSLog("[OpenIn] launched shell request helper for %@", item.menuIdentifier)
+                }
             }
-            NSLog("[OpenIn] dispatched shell request for %@", item.menuIdentifier)
         case .urlScheme:
             let encodedPath = MenuConfigStore.urlEncodedPath(path)
             let resolved = MenuConfigStore.resolve(item.template, path: encodedPath)
